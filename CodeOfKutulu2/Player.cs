@@ -693,7 +693,7 @@ namespace CodeOfKutulu2
                 if (goPointDist <= auraRange || isBetterToHide)
                 {
                     var isCurrPointSafe = startPoint.Weight <= escapePoint.Weight;
-                    var shouldStay = escapePoint.X == myExplorer.X && escapePoint.Y == myExplorer.Y;
+                    var shouldStay = escapePoint.X == myExplorer.X && escapePoint.Y == myExplorer.Y || isCurrPointSafe && goPointDist == auraRange;
 
                     if (shouldStay || isCurrPointSafe)
                     {
@@ -817,10 +817,8 @@ namespace CodeOfKutulu2
                 }
                 else if (neighbour.Weight == minWeight)
                 {
-                    //расстояние меньше минимального, а минимальное превышает ауру
                     if (explorerDist < minExplorerDist && minExplorerDist >= AuraRange)
                     {
-                        Console.Error.WriteLine($"{neighbour.X} {neighbour.Y}");
                         minWeight = neighbour.Weight;
                         minWeightPoint = neighbour;
                         minExplorerDist = explorerDist;
@@ -828,8 +826,7 @@ namespace CodeOfKutulu2
                         minVisibleSlashersCount = visibleSlashersCount;
                         minWandererDist = wanderDist;
                     }
-                    //расстояние не превышает минимального
-                    else if (explorerDist <= minExplorerDist)
+                    else if (explorerDist < minExplorerDist && explorerDist < AuraRange)
                     {
                         if (wanderersCount < minWanderersCount)
                         {

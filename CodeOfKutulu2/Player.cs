@@ -549,7 +549,9 @@ namespace CodeOfKutulu2
         {
             string[] inputs;
             int width = int.Parse(Console.ReadLine());
+            Console.Error.WriteLine(width);
             int height = int.Parse(Console.ReadLine());
+            Console.Error.WriteLine(height);
             //var map = new char[height, width];
 
             Points = new List<Point>();
@@ -558,6 +560,7 @@ namespace CodeOfKutulu2
             for (int i = 0; i < height; i++)
             {
                 string line = Console.ReadLine();
+                Console.Error.WriteLine(line);
                 for (int j = 0; j < line.Length; ++j)
                 {
                     var ch = line[j];
@@ -577,7 +580,10 @@ namespace CodeOfKutulu2
                 }
             }
 
-            inputs = Console.ReadLine().Split(' ');
+            var str = Console.ReadLine();
+            Console.Error.WriteLine(str);
+            inputs = str.Split(' ');
+
             int sanityLossLonely =
                 int.Parse(inputs[0]); // how much sanity you lose every turn when alone, always 3 until wood 1
             int sanityLossGroup =
@@ -599,6 +605,10 @@ namespace CodeOfKutulu2
                 var points = GetPointsCopy();
                 if (CurrentPlanCooldown > 0) CurrentPlanCooldown--;
                 if (CurrentLightCooldown > 0) CurrentLightCooldown--;
+                WandererPoints.Clear();
+                ExplorerPoints.Clear();
+                SlasherPoints.Clear();
+                WandererExplorerPathDistances.Clear();
 
                 Explorer myExplorer = null;
                 IList<Explorer> allExplorers = new List<Explorer>();
@@ -606,10 +616,14 @@ namespace CodeOfKutulu2
                 IList<Wanderer> slashers = new List<Wanderer>();
                 IList<Shelter> shelters = new List<Shelter>();
 
-                int entityCount = int.Parse(Console.ReadLine()); // the first given entity corresponds to your explorer
+                str = Console.ReadLine();
+                Console.Error.WriteLine(str);
+                int entityCount = int.Parse(str); // the first given entity corresponds to your explorer
                 for (int i = 0; i < entityCount; i++)
                 {
-                    inputs = Console.ReadLine().Split(' ');
+                    str = Console.ReadLine();
+                    Console.Error.WriteLine(str);
+                    inputs = str.Split(' ');
                     string entityType = inputs[0];
                     int id = int.Parse(inputs[1]);
                     int x = int.Parse(inputs[2]);
@@ -628,16 +642,19 @@ namespace CodeOfKutulu2
                         }
 
                         allExplorers.Add(explorer);
+                        ExplorerPoints.Add(explorer.Id, Points.Single(p => p.X == explorer.X && p.Y == explorer.Y));
                     }
                     else if (entityType == "WANDERER")
                     {
                         var wanderer = new Wanderer(id, x, y, param0, param1, param2);
                         wanderers.Add(wanderer);
+                        WandererPoints.Add(wanderer.Id, Points.Single(p => p.X == wanderer.X && p.Y == wanderer.Y));
                     }
                     else if (entityType == "SLASHER")
                     {
                         var slaher = new Wanderer(id, x, y, param0, param1, param2);
                         slashers.Add(slaher);
+                        SlasherPoints.Add(slaher.Id, Points.Single(p => p.X == slaher.X && p.Y == slaher.Y));
                     }
                     else if (entityType == "EFFECT_SHELTER")
                     {
@@ -680,11 +697,12 @@ namespace CodeOfKutulu2
                 finalPoint = points.Single(p => p.X == goPoint.X && p.Y == goPoint.Y);
                 var path = Calculator.GetPath(startPoint, finalPoint, points);
 
-                Console.Error.WriteLine($"{startPoint.X} {startPoint.Y} {startPoint.Weight}");
-                foreach (Point neighbour in startPoint.GetNeighbors(points))
-                    if (neighbour.Weight < BigValue)
-                        Console.Error.WriteLine($"{neighbour.X} {neighbour.Y} {neighbour.Weight}");
+                //Console.Error.WriteLine($"{startPoint.X} {startPoint.Y} {startPoint.Weight}");
+                //foreach (Point neighbour in startPoint.GetNeighbors(points))
+                //    if (neighbour.Weight < BigValue)
+                //        Console.Error.WriteLine($"{neighbour.X} {neighbour.Y} {neighbour.Weight}");
 
+                
                 var escapePoint = GetEscapePoint(startPoint, points, allExplorers, wanderers, slashers, myExplorer.Id);
                 var isBetterToHide = path.Count > 1 && escapePoint.Weight < (path[1] as Point).Weight;//опасно идти за эксплорером
 
@@ -694,7 +712,9 @@ namespace CodeOfKutulu2
                 {
                     var isCurrPointSafe = startPoint.Weight <= escapePoint.Weight;
                     //TODO: из-за isCurrPointSafe shouldStay сработает, даже если выгоднее другая точка
-                    var shouldStay = escapePoint.X == myExplorer.X && escapePoint.Y == myExplorer.Y || isCurrPointSafe && goPointDist == auraRange;
+                    var shouldStay = escapePoint.X == myExplorer.X && escapePoint.Y == myExplorer.Y;
+
+                   
 
                     if (shouldStay || isCurrPointSafe)
                     {
@@ -722,12 +742,12 @@ namespace CodeOfKutulu2
                     
                     if (shouldStay)
                     {
-                        Console.Error.WriteLine("Curr point is most safety");
+                        //Console.Error.WriteLine("Curr point is most safety");
                         Console.WriteLine("WAIT");
                     }
                     else
                     {
-                        Console.Error.WriteLine("Time to run");
+                        //Console.Error.WriteLine("Time to run");
                         Console.WriteLine("MOVE " + escapePoint.X + " " + escapePoint.Y);
                     }
                 }
@@ -743,24 +763,32 @@ namespace CodeOfKutulu2
         {
             var wanderesCount = 0;
             var destPoint = Points.Single(p => p.X == x && p.Y == y);
-            foreach (var wanderer in wanderers)
+            foreach (var wanderer in wanderers.Where(w => w.State == 1))
             {
-                var startPoint = Points.Single(p => p.X == wanderer.X && p.Y == wanderer.Y);
+                if (!WandererExplorerPathDistances.ContainsKey(wanderer.Id))
+                    WandererExplorerPathDistances.Add(wanderer.Id, new Dictionary<int, int>());
+
+                var startPoint = WandererPoints[wanderer.Id];
                 var path = Calculator.GetPath(startPoint, destPoint, Points);
                 var destDist = path.Count;
                 //Console.Error.WriteLine(destDist);
                 var isCloser = false;
                 foreach (var explorer in explorers.Where(e => e.Id != myExplorerId))
                 {
-                    var finalPoint = Points.Single(p => p.X == explorer.X && p.Y == explorer.Y);
-                    var explorerPath = Calculator.GetPath(startPoint, finalPoint, Points);
-                    var dist = explorerPath.Count;
-
+                    if (!WandererExplorerPathDistances[wanderer.Id].ContainsKey(explorer.Id))
+                    {
+                        var finalPoint = ExplorerPoints[explorer.Id];
+                        var explorerPath = Calculator.GetPath(startPoint, finalPoint, Points);
+                        WandererExplorerPathDistances[wanderer.Id].Add(explorer.Id, explorerPath.Count);
+                    }
+                    var dist = WandererExplorerPathDistances[wanderer.Id][explorer.Id];
                     if (dist < destDist || dist == destDist && wanderer.TargetId == explorer.Id)
                     {
                         isCloser = true;
                         break;
                     }
+
+
                 }
                 if (!isCloser) wanderesCount++;
             }
@@ -780,13 +808,12 @@ namespace CodeOfKutulu2
         /// <returns></returns>
         static Point GetEscapePoint(Point startPoint, IList<Point> points, IList<Explorer> allExplorers, IList<Wanderer> wanderers, IList<Wanderer> slashers, int myExplorerId)
         {
-
             var neighbours = startPoint.GetNeighbors(points);
 
             Point minWeightPoint = startPoint;
             var minWeight = startPoint.Weight;
             var minExplorerDist = allExplorers.Where(e => e.Id != myExplorerId).Min(e => GetManhattenDist(e.X, e.Y, startPoint.X, startPoint.Y));
-
+            
             var dangerousWanderers = wanderers.Where(w => w.State == 1 || w.State == 0 && w.Time == 1).ToList();
             var minWandererDist = !dangerousWanderers.Any() ? 0 : dangerousWanderers.Min(w => GetManhattenDist(w.X, w.Y, startPoint.X, startPoint.Y));
             var minWanderersCount = GetWanderesCount(startPoint.X, startPoint.Y, myExplorerId, allExplorers, wanderers);
@@ -828,7 +855,7 @@ namespace CodeOfKutulu2
                         minVisibleSlashersCount = visibleSlashersCount;
                         minWandererDist = wanderDist;
                     }
-                    else if (explorerDist < minExplorerDist && explorerDist < AuraRange)
+                    else if (explorerDist <= minExplorerDist)
                     {
                         if (wanderersCount < minWanderersCount)
                         {
@@ -978,37 +1005,37 @@ namespace CodeOfKutulu2
         static IDictionary<Point, int> GetSlasherDangerousPoints(IList<Explorer> allExplorers, IList<Wanderer> slashers, IList<Point> points, Explorer myExplorer)
         {
             var res = new Dictionary<Point, int>();
-            foreach (var slasher in slashers.Where(s => s.State == 3)) //TODO: State == 2
+            foreach (var slasher in slashers.Where(s => s.State == 3 || s.State == 2 && s.Time == 1 || s.State == 0 && s.Time == 1)) //TODO: State == 2
             {
                 var slasherPoint = points.Single(p => p.X == slasher.X && p.Y == slasher.Y);
 
-                //if (slasher.State == 2 && slasher.Time == 1)
-                //{
-                //    var isMyExplorerVisible = IsVisblePoint(slasher, myExplorer.X, myExplorer.Y);
-                //    if (isMyExplorerVisible)
-                //    {
-                //        Point n1 = null, n2 = null;
-                //        if (slasher.Y == myExplorer.Y)
-                //        {
-                //            n1 = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y - 1);
-                //            n2 = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y + 1);
-                //        }
-                //        else
-                //        {
-                //            n1 = points.Single(p => p.Y == myExplorer.Y && p.X == myExplorer.X - 1);
-                //            n2 = points.Single(p => p.Y == myExplorer.Y && p.X == myExplorer.X + 1);
-                //        }
-                //        var canIHide = n1.Weight < BigValue || n2.Weight < BigValue;
-                //        if (!canIHide)
-                //        {
-                //            var myExplorerePoint = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y);
-                //            if (!res.ContainsKey(myExplorerePoint)) res.Add(myExplorerePoint, 0);
-                //            res[myExplorerePoint]++;
-                //        }
+                if (slasher.State == 2 && slasher.Time == 1 || slasher.State == 0 && slasher.Time == 1)
+                {
+                    var isMyExplorerVisible = IsVisblePoint(slasher, myExplorer.X, myExplorer.Y);
+                    if (isMyExplorerVisible)
+                    {
+                        Point n1 = null, n2 = null;
+                        if (slasher.Y == myExplorer.Y)
+                        {
+                            n1 = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y - 1);
+                            n2 = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y + 1);
+                        }
+                        else
+                        {
+                            n1 = points.Single(p => p.Y == myExplorer.Y && p.X == myExplorer.X - 1);
+                            n2 = points.Single(p => p.Y == myExplorer.Y && p.X == myExplorer.X + 1);
+                        }
+                        var canIHide = n1.Weight < BigValue || n2.Weight < BigValue;
+                        if (!canIHide)
+                        {
+                            var myExplorerePoint = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y);
+                            if (!res.ContainsKey(myExplorerePoint)) res.Add(myExplorerePoint, 0);
+                            res[myExplorerePoint]++;
+                        }
 
-                //    }
-                //    continue;
-                //}
+                    }
+                    continue;
+                }
 
                 //TODO: just after spawn
                 var targetExplorer = allExplorers.SingleOrDefault(e => e.Id == slasher.TargetId);
@@ -1276,7 +1303,7 @@ namespace CodeOfKutulu2
                 }
             }
 
-            var noLightMyPoint = Points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y);
+            var noLightMyPoint = ExplorerPoints[myExplorer.Id];
 
             var points = GetPointsCopy();
             var myExplorerPoint = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y);
@@ -1305,7 +1332,7 @@ namespace CodeOfKutulu2
 
                     Point point2 = path[2] as Point;
                     var afterLightWandererPoint = Points.Single(p => p.X == point2.X && p.Y == point2.Y);
-                    var afterLightExplorerPoint = Points.Single(p => p.X == explorer.X && p.Y == explorer.Y);
+                    var afterLightExplorerPoint = ExplorerPoints[explorer.Id];
 
                     var afterLightMyPath = Calculator.GetPath(afterLightWandererPoint, noLightMyPoint, Points);
                     var afterLightExplorerPath =
@@ -1364,6 +1391,11 @@ namespace CodeOfKutulu2
 
         private static IList<Point> Points { get; set; }
         private static IDictionary<int, int> SlasherTargets = new Dictionary<int, int>();
+        private static IDictionary<int, Point> ExplorerPoints = new Dictionary<int, Point>();
+        private static IDictionary<int, Point> WandererPoints = new Dictionary<int, Point>();
+        private static IDictionary<int, Point> SlasherPoints = new Dictionary<int, Point>();
+
+        private static IDictionary<int, Dictionary<int, int>> WandererExplorerPathDistances = new Dictionary<int, Dictionary<int, int>>();
 
         private const int BigValue = 999999;
         private const int SlasherWeight = 1000;
@@ -1399,8 +1431,7 @@ namespace CodeOfKutulu2
 
         private const int ShelterDefaultEnergy = 10;
         private const int MaxShelterEnergyLeak = 3;
-
-
+        
         #endregion
 
     }

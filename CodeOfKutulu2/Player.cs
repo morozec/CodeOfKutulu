@@ -549,10 +549,9 @@ namespace CodeOfKutulu2
         {
             string[] inputs;
             int width = int.Parse(Console.ReadLine());
-            Console.Error.WriteLine(width);
+            //Console.Error.WriteLine(width);
             int height = int.Parse(Console.ReadLine());
-            Console.Error.WriteLine(height);
-            //var map = new char[height, width];
+            //Console.Error.WriteLine(height);
 
             Points = new List<Point>();
             Point startPoint = null, finalPoint = null;
@@ -560,7 +559,7 @@ namespace CodeOfKutulu2
             for (int i = 0; i < height; i++)
             {
                 string line = Console.ReadLine();
-                Console.Error.WriteLine(line);
+                //Console.Error.WriteLine(line);
                 for (int j = 0; j < line.Length; ++j)
                 {
                     var ch = line[j];
@@ -581,7 +580,7 @@ namespace CodeOfKutulu2
             }
 
             var str = Console.ReadLine();
-            Console.Error.WriteLine(str);
+            //Console.Error.WriteLine(str);
             inputs = str.Split(' ');
 
             int sanityLossLonely =
@@ -617,12 +616,12 @@ namespace CodeOfKutulu2
                 IList<Shelter> shelters = new List<Shelter>();
 
                 str = Console.ReadLine();
-                Console.Error.WriteLine(str);
+                //Console.Error.WriteLine(str);
                 int entityCount = int.Parse(str); // the first given entity corresponds to your explorer
                 for (int i = 0; i < entityCount; i++)
                 {
                     str = Console.ReadLine();
-                    Console.Error.WriteLine(str);
+                    //Console.Error.WriteLine(str);
                     inputs = str.Split(' ');
                     string entityType = inputs[0];
                     int id = int.Parse(inputs[1]);
@@ -771,7 +770,6 @@ namespace CodeOfKutulu2
                 var startPoint = WandererPoints[wanderer.Id];
                 var path = Calculator.GetPath(startPoint, destPoint, Points);
                 var destDist = path.Count;
-                //Console.Error.WriteLine(destDist);
                 var isCloser = false;
                 foreach (var explorer in explorers.Where(e => e.Id != myExplorerId))
                 {
@@ -819,7 +817,7 @@ namespace CodeOfKutulu2
             var minWanderersCount = GetWanderesCount(startPoint.X, startPoint.Y, myExplorerId, allExplorers, wanderers);
             var minVisibleSlashersCount = slashers.Count(s => IsVisblePoint(s, startPoint.X, startPoint.Y));
 
-            //Console.Error.WriteLine($"{startPoint.X} {startPoint.Y} {minExplorerDist} {minWanderersCount} {minVisibleSlashersCount}");
+            Console.Error.WriteLine($"{startPoint.X} {startPoint.Y} {minExplorerDist} {minWanderersCount} {minVisibleSlashersCount} {minWandererDist}");
 
             foreach (Point neighbour in neighbours)
             {
@@ -832,7 +830,7 @@ namespace CodeOfKutulu2
                 var visibleSlashersCount =
                     slashers.Count(s => IsVisblePoint(s, neighbour.X, neighbour.Y));
 
-                //Console.Error.WriteLine($"{neighbour.X} {neighbour.Y} {explorerDist} {wanderersCount} {visibleSlashersCount}");
+                Console.Error.WriteLine($"{neighbour.X} {neighbour.Y} {explorerDist} {wanderersCount} {visibleSlashersCount} {wanderDist}");
 
                 if (neighbour.Weight < minWeight)
                 {

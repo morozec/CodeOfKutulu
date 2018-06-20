@@ -693,7 +693,7 @@ namespace CodeOfKutulu2
                 if (goPointDist <= auraRange || isBetterToHide)
                 {
                     var isCurrPointSafe = startPoint.Weight <= escapePoint.Weight;
-                    var shouldStay = escapePoint.X == myExplorer.X && escapePoint.Y == myExplorer.Y || isCurrPointSafe && goPointDist == auraRange;
+                    var shouldStay = escapePoint.X == myExplorer.X && escapePoint.Y == myExplorer.Y;
 
                     if (shouldStay || isCurrPointSafe)
                     {
@@ -786,8 +786,8 @@ namespace CodeOfKutulu2
             var minWeight = startPoint.Weight;
             var minExplorerDist = allExplorers.Where(e => e.Id != myExplorerId).Min(e => GetManhattenDist(e.X, e.Y, startPoint.X, startPoint.Y));
 
-            //var dangerousWanderers = wanderers.Where(w => w.State == 1 || w.State == 0 && w.Time == 1).ToList();
-            //var minWandererDist = !dangerousWanderers.Any() ? 0 : dangerousWanderers.Min(w => GetManhattenDist(w.X, w.Y, startPoint.X, startPoint.Y));
+            var dangerousWanderers = wanderers.Where(w => w.State == 1 || w.State == 0 && w.Time == 1).ToList();
+            var minWandererDist = !dangerousWanderers.Any() ? 0 : dangerousWanderers.Min(w => GetManhattenDist(w.X, w.Y, startPoint.X, startPoint.Y));
             var minWanderersCount = GetWanderesCount(startPoint.X, startPoint.Y, myExplorerId, allExplorers, wanderers);
             var minVisibleSlashersCount = slashers.Count(s => IsVisblePoint(s, startPoint.X, startPoint.Y));
 
@@ -799,7 +799,7 @@ namespace CodeOfKutulu2
                     continue;
 
                 var explorerDist = allExplorers.Where(e => e.Id != myExplorerId).Min(e => GetManhattenDist(e.X, e.Y, neighbour.X, neighbour.Y));
-                //var wanderDist = !dangerousWanderers.Any() ?  0 : dangerousWanderers.Min(w => GetManhattenDist(w.X, w.Y, neighbour.X, neighbour.Y));
+                var wanderDist = !dangerousWanderers.Any() ?  0 : dangerousWanderers.Min(w => GetManhattenDist(w.X, w.Y, neighbour.X, neighbour.Y));
                 var wanderersCount = GetWanderesCount(neighbour.X, neighbour.Y, myExplorerId, allExplorers, wanderers);
                 var visibleSlashersCount =
                     slashers.Count(s => IsVisblePoint(s, neighbour.X, neighbour.Y));
@@ -813,18 +813,23 @@ namespace CodeOfKutulu2
                     minExplorerDist = explorerDist;
                     minWanderersCount = wanderersCount;
                     minVisibleSlashersCount = visibleSlashersCount;
+                    minWandererDist = wanderDist;
                 }
                 else if (neighbour.Weight == minWeight)
                 {
-                    if (minExplorerDist >= AuraRange && explorerDist < minExplorerDist)
+                    //расстояние меньше минимального, а минимальное превышает ауру
+                    if (explorerDist < minExplorerDist && minExplorerDist >= AuraRange)
                     {
+                        Console.Error.WriteLine($"{neighbour.X} {neighbour.Y}");
                         minWeight = neighbour.Weight;
                         minWeightPoint = neighbour;
                         minExplorerDist = explorerDist;
                         minWanderersCount = wanderersCount;
                         minVisibleSlashersCount = visibleSlashersCount;
+                        minWandererDist = wanderDist;
                     }
-                    else if (explorerDist < AuraRange)
+                    //расстояние не превышает минимального
+                    else if (explorerDist <= minExplorerDist)
                     {
                         if (wanderersCount < minWanderersCount)
                         {
@@ -833,6 +838,7 @@ namespace CodeOfKutulu2
                             minExplorerDist = explorerDist;
                             minWanderersCount = wanderersCount;
                             minVisibleSlashersCount = visibleSlashersCount;
+                            minWandererDist = wanderDist;
                         }
                         else if (wanderersCount == minWanderersCount)
                         {
@@ -843,6 +849,19 @@ namespace CodeOfKutulu2
                                 minExplorerDist = explorerDist;
                                 minWanderersCount = wanderersCount;
                                 minVisibleSlashersCount = visibleSlashersCount;
+                                minWandererDist = wanderDist;
+                            }
+                            else if (visibleSlashersCount == minVisibleSlashersCount)
+                            {
+                                if (wanderDist > minWandererDist)
+                                {
+                                    minWeight = neighbour.Weight;
+                                    minWeightPoint = neighbour;
+                                    minExplorerDist = explorerDist;
+                                    minWanderersCount = wanderersCount;
+                                    minVisibleSlashersCount = visibleSlashersCount;
+                                    minWandererDist = wanderDist;
+                                }
                             }
                         }
                     }
@@ -1310,6 +1329,8 @@ namespace CodeOfKutulu2
                     SlasherTargets[slasher.Id] = slasher.TargetId;
             }
         }
+
+
 
 
         #region static and constants values

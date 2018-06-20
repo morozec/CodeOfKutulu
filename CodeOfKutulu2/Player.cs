@@ -655,7 +655,7 @@ namespace CodeOfKutulu2
 
                 UpdateSlasherTargets(slashers);
 
-                var slasherDangerousPoints = GetSlasherDangerousPoints(allExplorers, slashers, points);
+                var slasherDangerousPoints = GetSlasherDangerousPoints(allExplorers, slashers, points, myExplorer);
                 var wandererDangerousPoints = GetWandererDangerousPoints(myExplorer, wanderers, points);
 
                 //var isMyCellDangerous = slasherDangerousPoints.Keys.Any(p => p.X == myExplorer.X && p.Y == myExplorer.Y) ||
@@ -680,10 +680,10 @@ namespace CodeOfKutulu2
                 finalPoint = points.Single(p => p.X == goPoint.X && p.Y == goPoint.Y);
                 var path = Calculator.GetPath(startPoint, finalPoint, points);
 
-                //Console.Error.WriteLine($"{startPoint.X} {startPoint.Y} {startPoint.Weight}");
-                //foreach (Point neighbour in startPoint.GetNeighbors(points))
-                //    if (neighbour.Weight < BigValue)
-                //        Console.Error.WriteLine($"{neighbour.X} {neighbour.Y} {neighbour.Weight}");
+                Console.Error.WriteLine($"{startPoint.X} {startPoint.Y} {startPoint.Weight}");
+                foreach (Point neighbour in startPoint.GetNeighbors(points))
+                    if (neighbour.Weight < BigValue)
+                        Console.Error.WriteLine($"{neighbour.X} {neighbour.Y} {neighbour.Weight}");
 
                 var escapePoint = GetEscapePoint(startPoint, points, allExplorers, wanderers, slashers, myExplorer.Id);
                 var isBetterToHide = path.Count > 1 && escapePoint.Weight < (path[1] as Point).Weight;//опасно идти за эксплорером
@@ -693,6 +693,7 @@ namespace CodeOfKutulu2
                 if (goPointDist <= auraRange || isBetterToHide)
                 {
                     var isCurrPointSafe = startPoint.Weight <= escapePoint.Weight;
+                    //TODO: из-за isCurrPointSafe shouldStay сработает, даже если выгоднее другая точка
                     var shouldStay = escapePoint.X == myExplorer.X && escapePoint.Y == myExplorer.Y || isCurrPointSafe && goPointDist == auraRange;
 
                     if (shouldStay || isCurrPointSafe)
@@ -791,7 +792,7 @@ namespace CodeOfKutulu2
             var minWanderersCount = GetWanderesCount(startPoint.X, startPoint.Y, myExplorerId, allExplorers, wanderers);
             var minVisibleSlashersCount = slashers.Count(s => IsVisblePoint(s, startPoint.X, startPoint.Y));
 
-            Console.Error.WriteLine($"{startPoint.X} {startPoint.Y} {minExplorerDist} {minWanderersCount} {minVisibleSlashersCount}");
+            //Console.Error.WriteLine($"{startPoint.X} {startPoint.Y} {minExplorerDist} {minWanderersCount} {minVisibleSlashersCount}");
 
             foreach (Point neighbour in neighbours)
             {
@@ -804,7 +805,7 @@ namespace CodeOfKutulu2
                 var visibleSlashersCount =
                     slashers.Count(s => IsVisblePoint(s, neighbour.X, neighbour.Y));
 
-                Console.Error.WriteLine($"{neighbour.X} {neighbour.Y} {explorerDist} {wanderersCount} {visibleSlashersCount}");
+                //Console.Error.WriteLine($"{neighbour.X} {neighbour.Y} {explorerDist} {wanderersCount} {visibleSlashersCount}");
 
                 if (neighbour.Weight < minWeight)
                 {
@@ -817,6 +818,7 @@ namespace CodeOfKutulu2
                 }
                 else if (neighbour.Weight == minWeight)
                 {
+                    //TODO: дикие пляски с аурой
                     if (explorerDist < minExplorerDist && minExplorerDist >= AuraRange)
                     {
                         minWeight = neighbour.Weight;
@@ -973,12 +975,40 @@ namespace CodeOfKutulu2
         }
 
 
-        static IDictionary<Point, int> GetSlasherDangerousPoints(IList<Explorer> allExplorers, IList<Wanderer> slashers, IList<Point> points)
+        static IDictionary<Point, int> GetSlasherDangerousPoints(IList<Explorer> allExplorers, IList<Wanderer> slashers, IList<Point> points, Explorer myExplorer)
         {
             var res = new Dictionary<Point, int>();
-            foreach (var slasher in slashers.Where(s => s.State == 3)) //TODO: State == 3
+            foreach (var slasher in slashers.Where(s => s.State == 3)) //TODO: State == 2
             {
                 var slasherPoint = points.Single(p => p.X == slasher.X && p.Y == slasher.Y);
+
+                //if (slasher.State == 2 && slasher.Time == 1)
+                //{
+                //    var isMyExplorerVisible = IsVisblePoint(slasher, myExplorer.X, myExplorer.Y);
+                //    if (isMyExplorerVisible)
+                //    {
+                //        Point n1 = null, n2 = null;
+                //        if (slasher.Y == myExplorer.Y)
+                //        {
+                //            n1 = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y - 1);
+                //            n2 = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y + 1);
+                //        }
+                //        else
+                //        {
+                //            n1 = points.Single(p => p.Y == myExplorer.Y && p.X == myExplorer.X - 1);
+                //            n2 = points.Single(p => p.Y == myExplorer.Y && p.X == myExplorer.X + 1);
+                //        }
+                //        var canIHide = n1.Weight < BigValue || n2.Weight < BigValue;
+                //        if (!canIHide)
+                //        {
+                //            var myExplorerePoint = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y);
+                //            if (!res.ContainsKey(myExplorerePoint)) res.Add(myExplorerePoint, 0);
+                //            res[myExplorerePoint]++;
+                //        }
+
+                //    }
+                //    continue;
+                //}
 
                 //TODO: just after spawn
                 var targetExplorer = allExplorers.SingleOrDefault(e => e.Id == slasher.TargetId);
@@ -1001,7 +1031,7 @@ namespace CodeOfKutulu2
                     canHide = n1.Weight < BigValue || n2.Weight < BigValue;
                 }
 
-                if (targetExplorer == null || !isVisible || canHide) //почемаем все точки на LOS опасными
+                if (targetExplorer == null || slasher.TargetId == myExplorer.Id || !isVisible || canHide) //почемаем все точки на LOS опасными
                 {
                     var currPoint = slasherPoint;
                     if (!res.ContainsKey(currPoint)) res.Add(currPoint, 0);

@@ -671,14 +671,15 @@ namespace CodeOfKutulu2
 
 
             var ems = Calculator.GetExpansionMatrices(Points.Where(p => p.Weight < BigValue), Points.Where(p => p.Weight < BigValue));
-            Pathes = new Dictionary<Point, IDictionary<Point, IList<APoint>>>();
+            Arr = new IList<APoint>[width,height][,];
+            //Pathes = new Dictionary<Point, IDictionary<Point, IList<APoint>>>();
             for (int i = 0; i < height; ++i)
             {
                 for (int j = 0; j < width; ++j)
                 {
                     var source = PointsTable[j, i];
                     if (source.Weight == BigValue) continue;
-                    Pathes.Add(source, new Dictionary<Point, IList<APoint>>());
+                    Arr[j,i] = new IList<APoint>[width,height];
                     for (int k = 0; k < height; ++k)
                     {
                         for (int l = 0; l < width; ++l)
@@ -686,7 +687,7 @@ namespace CodeOfKutulu2
                             var dest = PointsTable[l, k];
                             if (dest.Weight == BigValue) continue;
                             var path = Calculator.ReconstructPath(dest, ems[source], Points);
-                            Pathes[source].Add(dest, path);
+                            Arr[j, i][l, k] = path;
                         }
                     }
                 }
@@ -696,7 +697,7 @@ namespace CodeOfKutulu2
                     // game loop
             while (true)
             {
-                var watch = System.Diagnostics.Stopwatch.StartNew();
+                //var watch = System.Diagnostics.Stopwatch.StartNew();
 
                 var points = GetPointsCopy();
                 if (CurrentPlanCooldown > 0) CurrentPlanCooldown--;
@@ -879,9 +880,9 @@ namespace CodeOfKutulu2
                 //}
 
 
-                watch.Stop();
-                var elapsedMs = watch.ElapsedMilliseconds;
-                Console.Error.WriteLine(elapsedMs);
+                //watch.Stop();
+                //var elapsedMs = watch.ElapsedMilliseconds;
+                //Console.Error.WriteLine(elapsedMs);
             }
         }
 
@@ -899,19 +900,16 @@ namespace CodeOfKutulu2
             DamageItem minDamageItem = damageItems[0];
             
             var minFds = new Dictionary<Unit, int>();
-            var startPoint = PointsTable[myExplorer.X, myExplorer.Y];
             foreach (var e in allExplorers.Where(e => e.Id != myExplorer.Id))
             {
-                var finalPoint = PointsTable[e.X, e.Y];
-                var path = Pathes[startPoint][finalPoint]; 
-                var dist = path.Count;
+                var path = Arr[myExplorer.X, myExplorer.Y][e.X, e.Y]; 
+                var dist = path.Count - 1;
                 minFds.Add(e, dist);
             }
             foreach (var s in activeShelters)
             {
-                var finalPoint = PointsTable[s.X, s.Y];
-                var path = Pathes[startPoint][finalPoint];
-                var dist = path.Count;
+                var path = Arr[myExplorer.X, myExplorer.Y][s.X, s.Y];
+                var dist = path.Count - 1;
                 minFds.Add(s, dist);
             }
             var minFriendDistance = minFds.Values.Min();
@@ -936,21 +934,18 @@ namespace CodeOfKutulu2
                 var di = damageItems[i];
                 //var friendDist = allExplorers.Where(e => e.Id != myExplorer.Id)
                 //    .Min(e => GetManhattenDist(e.X, e.Y, di.Point.X, di.Point.Y));
-                var currStartPoint = PointsTable[di.Point.X, di.Point.Y];
                 var fds = new Dictionary<Unit, int>();
                 foreach (var e in allExplorers.Where(e => e.Id != myExplorer.Id))
                 {
-                    var finalPoint = PointsTable[e.X, e.Y];
-                    var path = Pathes[currStartPoint][finalPoint];
-                    var dist = path.Count;
+                    var path = Arr[di.Point.X, di.Point.Y][e.X, e.Y];
+                    var dist = path.Count - 1;
                     fds.Add(e, dist);
                 }
 
                 foreach (var s in activeShelters)
                 {
-                    var finalPoint = PointsTable[s.X, s.Y];
-                    var path = Pathes[startPoint][finalPoint];
-                    var dist = path.Count;
+                    var path = Arr[di.Point.X, di.Point.Y][s.X, s.Y];
+                    var dist = path.Count - 1;
                     fds.Add(s, dist);
                 }
 
@@ -1033,18 +1028,31 @@ namespace CodeOfKutulu2
                 if (isFinished) continue;
 
                 //ближе к другу, если мы вне ауры
-                if (minFriendDistance > GetAuraRange(minFds, minFriendDistance))
+                var minAuraRange = GetAuraRange(minFds, minFriendDistance);
+                var auraRange = GetAuraRange(fds, friendDistance);
+                if (friendDistance < minFriendDistance && minFriendDistance > minAuraRange)
                 {
-                    if (friendDistance < minFriendDistance)
-                    {
-                        minDamageItem = di;
-                        minFds = fds;
-                        minFriendDistance = friendDistance;
-                        nextMinFd = nextFd;
-                        continue;
-                    }
-                    if (friendDistance > minFriendDistance) continue;
+                    minDamageItem = di;
+                    minFds = fds;
+                    minFriendDistance = friendDistance;
+                    nextMinFd = nextFd;
+                    continue;
                 }
+                if (friendDistance > minFriendDistance && friendDistance > auraRange)
+                    continue;
+
+                //if (minFriendDistance > GetAuraRange(minFds, minFriendDistance))
+                //{
+                //    if (friendDistance < minFriendDistance)
+                //    {
+                //        minDamageItem = di;
+                //        minFds = fds;
+                //        minFriendDistance = friendDistance;
+                //        nextMinFd = nextFd;
+                //        continue;
+                //    }
+                //    if (friendDistance > minFriendDistance) continue;
+                //}
                 //else if (friendDistance > GetAuraRange(fds, friendDistance)) continue;//не выходим из ауры
 
                 //дальше от активных странников
@@ -1328,8 +1336,8 @@ namespace CodeOfKutulu2
                     var afterLightWandererPoint = PointsTable[point2.X, point2.Y];
                     var afterLightExplorerPoint = ExplorerPoints[explorer.Id];
 
-                    var afterLightMyPath = Pathes[afterLightWandererPoint][noLightMyPoint];
-                    var afterLightExplorerPath = Pathes[afterLightWandererPoint][afterLightExplorerPoint];
+                    var afterLightMyPath = Arr[point2.X, point2.Y][myExplorer.X, myExplorer.Y];
+                    var afterLightExplorerPath = Arr[point2.X, point2.Y][explorer.X, explorer.Y]; 
 
                     if (afterLightMyPath.Sum(p => (p as Point).Weight) >
                         afterLightExplorerPath.Sum(p => (p as Point).Weight))
@@ -1561,7 +1569,7 @@ namespace CodeOfKutulu2
                 var pathCounts = new Dictionary<Explorer, int>();
                 foreach (var e in explorers)
                 {
-                    var path = Pathes[PointsTable[wanderer.X, wanderer.Y]][PointsTable[e.X, e.Y]]; 
+                    var path = Arr[wanderer.X, wanderer.Y][e.X, e.Y];
                     pathCounts.Add(e, path.Count);
                 }
 
@@ -1573,9 +1581,7 @@ namespace CodeOfKutulu2
 
                 Point nearestPoint = PointsTable[wanderer.X, wanderer.Y];
 
-                var startPoint = PointsTable[wanderer.X, wanderer.Y];
-                var finalPoint = PointsTable[targetExplorer.X, targetExplorer.Y];
-                int minDist = Pathes[startPoint][finalPoint].Count; 
+                int minDist = Arr[wanderer.X, wanderer.Y][targetExplorer.X, targetExplorer.Y].Count; 
                 //if (manhDist > ManhDistToUseAStar)
                 //{
                 //    minDist = GetManhattenDist(nearestPoint.X,
@@ -1605,8 +1611,7 @@ namespace CodeOfKutulu2
                         //    var path = Calculator.GetPath(startPoint, finalPoint, Points);
                         //    dist = path.Count;
                         //}
-                        var nStartPoint = PointsTable[n.X, n.Y];
-                        var dist = Pathes[nStartPoint][finalPoint].Count;
+                        var dist = Arr[n.X, n.Y][targetExplorer.X, targetExplorer.Y].Count;
 
                         if (dist < minDist)
                         {
@@ -1835,8 +1840,8 @@ namespace CodeOfKutulu2
         private const int PredictionDepth = 4;
 
         //private static IDictionary<APoint, ExpansionMatrixConteiner> Ems;
-        private static IDictionary<Point, IDictionary<Point, IList<APoint>>> Pathes;
-        //private static IList<APoint>[,][,] Arr;
+        //private static IDictionary<Point, IDictionary<Point, IList<APoint>>> Pathes;
+        private static IList<APoint>[,][,] Arr;
 
         #endregion
 

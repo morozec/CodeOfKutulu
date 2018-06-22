@@ -889,20 +889,19 @@ namespace CodeOfKutulu2
         {
             var damageItems = GetDamageItems(myExplorer, allExplorers, wanderers, slashers);
             DamageItem minDamageItem = damageItems[0];
-
-
+            
+            var minFds = new Dictionary<int, int>();
             var startPoint = PointsTable[myExplorer.X, myExplorer.Y];
-            var minFriendDist = int.MaxValue;
             foreach (var e in allExplorers.Where(e => e.Id != myExplorer.Id))
             {
                 var finalPoint = PointsTable[e.X, e.Y];
                 var path = Pathes[startPoint][finalPoint]; 
                 var dist = path.Count;
-                if (dist < minFriendDist)
-                {
-                    minFriendDist = dist;
-                }
+                minFds.Add(e.Id, dist);
             }
+
+            var tmpMin = minFds.Values.Where(d => d != minFds.Values.Min());
+            var nextMinFd = tmpMin.Any() ? tmpMin.Min() : 0;
 
             //var minFriendDist = allExplorers.Where(e => e.Id != myExplorer.Id)
             //    .Min(e => GetManhattenDist(e.X, e.Y, damageItems[0].Point.X, damageItems[0].Point.Y));
@@ -922,16 +921,13 @@ namespace CodeOfKutulu2
                 //var friendDist = allExplorers.Where(e => e.Id != myExplorer.Id)
                 //    .Min(e => GetManhattenDist(e.X, e.Y, di.Point.X, di.Point.Y));
                 var currStartPoint = PointsTable[di.Point.X, di.Point.Y];
-                var friendDist = int.MaxValue;
+                var fds = new Dictionary<int, int>();
                 foreach (var e in allExplorers.Where(e => e.Id != myExplorer.Id))
                 {
                     var finalPoint = PointsTable[e.X, e.Y];
                     var path = Pathes[currStartPoint][finalPoint];
                     var dist = path.Count;
-                    if (dist < friendDist)
-                    {
-                        friendDist = dist;
-                    }
+                    fds.Add(e.Id, dist);
                 }
 
                 //var wandererDist = walkingWanderers.Any() ? walkingWanderers.Min(w =>
@@ -944,7 +940,7 @@ namespace CodeOfKutulu2
                 if (di.SumDamage < minDamageItem.SumDamage)
                 {
                     minDamageItem = di;
-                    minFriendDist = friendDist;
+                    minFds = fds;
                     continue;
                 }
                 if (di.SumDamage > minDamageItem.SumDamage) continue;
@@ -960,7 +956,7 @@ namespace CodeOfKutulu2
                     {
                         isFinished = true;
                         minDamageItem = di;
-                        minFriendDist = friendDist;
+                        minFds = fds;
                         break;
                     }
 
@@ -987,7 +983,7 @@ namespace CodeOfKutulu2
                     {
                         isFinished = true;
                         minDamageItem = di;
-                        minFriendDist = friendDist;
+                        minFds = fds;
                         break;
                     }
 
@@ -1002,16 +998,16 @@ namespace CodeOfKutulu2
                 if (isFinished) continue;
 
                 //ближе к другу, если мы вне ауры
-                if (minFriendDist > AuraRange)
+                if (minFds.Values.Min() > AuraRange)
                 {
-                    if (friendDist < minFriendDist)
+                    if (fds.Values.Min() < minFds.Values.Min())
                     {
                         minDamageItem = di;
-                        minFriendDist = friendDist;
+                        minFds = fds;
                         continue;
                     }
                 }
-                else if (friendDist > AuraRange) continue;//не выходим из ауры
+                else if (fds.Values.Min() > AuraRange) continue;//не выходим из ауры
 
                 //дальше от активных странников
                 index = 0;
@@ -1021,7 +1017,7 @@ namespace CodeOfKutulu2
                     {
                         isFinished = true;
                         minDamageItem = di;
-                        minFriendDist = friendDist;
+                        minFds = fds;
                         break;
                     }
 
@@ -1043,7 +1039,7 @@ namespace CodeOfKutulu2
                     {
                         isFinished = true;
                         minDamageItem = di;
-                        minFriendDist = friendDist;
+                        minFds = fds;
                         break;
                     }
 
@@ -1059,13 +1055,13 @@ namespace CodeOfKutulu2
                 if (isFinished) continue;
 
                 //ближе к другу, даже если в ауре
-                if (friendDist < minFriendDist)
+                if (fds.Values.Min() < minFds.Values.Min())
                 {
                     minDamageItem = di;
-                    minFriendDist = friendDist;
+                    minFds = fds;
                     continue;
                 }
-                if (friendDist > minFriendDist) continue;
+                if (fds.Values.Min() > minFds.Values.Min()) continue;
 
                 //дальше от слэшеров
                 index = 0;
@@ -1075,7 +1071,7 @@ namespace CodeOfKutulu2
                     {
                         isFinished = true;
                         minDamageItem = di;
-                        minFriendDist = friendDist;
+                        minFds = fds;
                         break;
                     }
 
@@ -1097,7 +1093,7 @@ namespace CodeOfKutulu2
                     {
                         isFinished = true;
                         minDamageItem = di;
-                        minFriendDist = friendDist;
+                        minFds = fds;
                         break;
                     }
 
@@ -1110,6 +1106,17 @@ namespace CodeOfKutulu2
                     index++;
                 }
                 if (isFinished) continue;
+
+                //следующий ближайший дрг
+                var tmp = fds.Values.Where(d => d != fds.Values.Min());
+                var nextFd = tmp.Any() ? tmp.Min() : 0;
+                if (nextFd < nextMinFd)
+                {
+                    minDamageItem = di;
+                    minFds = fds;
+                    continue;
+                }
+                if (nextFd > nextMinFd) continue;
             }
             
 
@@ -1865,6 +1872,33 @@ namespace CodeOfKutulu2
                     newSlashers.Add(newSlasher);
 
                 }
+                else if (slasher.State == 0) //зарождается
+                {
+                    var newTime = slasher.Time - 1;
+                    int newState;
+                    int newTargetExplorerId;
+
+                    if (newTime > 0)
+                    {
+                        newState = 0;
+                        newTargetExplorerId = -1;
+                    }
+                    else
+                    {
+                        if (nearestVisibleExplorer != null)
+                        {
+                            newState = 3;
+                            newTargetExplorerId = nearestVisibleExplorer.Id;
+                        }
+                        else
+                        {
+                            newState = 1;
+                            newTargetExplorerId = -1;
+                        }
+                    }
+                    var newSlasher = new Wanderer(slasher.Id, slasher.X, slasher.Y, newTime, newState, newTargetExplorerId);
+                    newSlashers.Add(newSlasher);
+                }
             }
 
             return newSlashers;
@@ -1920,7 +1954,7 @@ namespace CodeOfKutulu2
         private const int MaxShelterEnergyLeak = 3;
 
         private const int ManhDistToUseAStar = 4;
-        private const int PredictionDepth = 3;
+        private const int PredictionDepth = 4;
 
         //private static IDictionary<APoint, ExpansionMatrixConteiner> Ems;
         private static IDictionary<Point, IDictionary<Point, IList<APoint>>> Pathes;

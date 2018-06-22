@@ -694,7 +694,7 @@ namespace CodeOfKutulu2
             //var path = Calculator.ReconstructPath(Points[10], ems[Points[0]], Points);
 
                     // game loop
-                    while (true)
+            while (true)
             {
                 //var watch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -883,6 +883,13 @@ namespace CodeOfKutulu2
                 //var elapsedMs = watch.ElapsedMilliseconds;
             }
         }
+
+        static int GetAuraRange(IDictionary<Unit, int> fds, int friendDistance)
+        {
+            var minDistUnits = fds.Keys.Where(x => fds[x] == friendDistance);
+            if (minDistUnits.Any(u => u is Shelter)) return 0;
+            return FriendAuraRange;
+        }
        
         static Point GetNewEscapePoint(Explorer myExplorer, IList<Explorer> allExplorers,
             IList<Wanderer> wanderers, IList<Wanderer> slashers, IEnumerable<Shelter> activeShelters)
@@ -890,17 +897,25 @@ namespace CodeOfKutulu2
             var damageItems = GetDamageItems(myExplorer, allExplorers, wanderers, slashers);
             DamageItem minDamageItem = damageItems[0];
             
-            var minFds = new Dictionary<int, int>();
+            var minFds = new Dictionary<Unit, int>();
             var startPoint = PointsTable[myExplorer.X, myExplorer.Y];
             foreach (var e in allExplorers.Where(e => e.Id != myExplorer.Id))
             {
                 var finalPoint = PointsTable[e.X, e.Y];
                 var path = Pathes[startPoint][finalPoint]; 
                 var dist = path.Count;
-                minFds.Add(e.Id, dist);
+                minFds.Add(e, dist);
             }
+            foreach (var s in activeShelters)
+            {
+                var finalPoint = PointsTable[s.X, s.Y];
+                var path = Pathes[startPoint][finalPoint];
+                var dist = path.Count;
+                minFds.Add(s, dist);
+            }
+            var minFriendDistance = minFds.Values.Min();
 
-            var tmpMin = minFds.Values.Where(d => d != minFds.Values.Min());
+            var tmpMin = minFds.Values.Where(d => d != minFriendDistance);
             var nextMinFd = tmpMin.Any() ? tmpMin.Min() : 0;
 
             //var minFriendDist = allExplorers.Where(e => e.Id != myExplorer.Id)
@@ -921,14 +936,24 @@ namespace CodeOfKutulu2
                 //var friendDist = allExplorers.Where(e => e.Id != myExplorer.Id)
                 //    .Min(e => GetManhattenDist(e.X, e.Y, di.Point.X, di.Point.Y));
                 var currStartPoint = PointsTable[di.Point.X, di.Point.Y];
-                var fds = new Dictionary<int, int>();
+                var fds = new Dictionary<Unit, int>();
                 foreach (var e in allExplorers.Where(e => e.Id != myExplorer.Id))
                 {
                     var finalPoint = PointsTable[e.X, e.Y];
                     var path = Pathes[currStartPoint][finalPoint];
                     var dist = path.Count;
-                    fds.Add(e.Id, dist);
+                    fds.Add(e, dist);
                 }
+
+                foreach (var s in activeShelters)
+                {
+                    var finalPoint = PointsTable[s.X, s.Y];
+                    var path = Pathes[startPoint][finalPoint];
+                    var dist = path.Count;
+                    fds.Add(s, dist);
+                }
+
+                var friendDistance = fds.Values.Min();
 
                 //var wandererDist = walkingWanderers.Any() ? walkingWanderers.Min(w =>
                 //    GetManhattenDist(w.X, w.Y, di.Point.X, di.Point.Y)) : 0;
@@ -936,11 +961,13 @@ namespace CodeOfKutulu2
                 //    ? walkingWanderers.Count(w =>
                 //        GetManhattenDist(w.X, w.Y, di.Point.X, di.Point.Y) == wandererDist) : 0;
 
+
                 //наименьший суммарный урон
                 if (di.SumDamage < minDamageItem.SumDamage)
                 {
                     minDamageItem = di;
                     minFds = fds;
+                    minFriendDistance = friendDistance;
                     continue;
                 }
                 if (di.SumDamage > minDamageItem.SumDamage) continue;
@@ -957,6 +984,7 @@ namespace CodeOfKutulu2
                         isFinished = true;
                         minDamageItem = di;
                         minFds = fds;
+                        minFriendDistance = friendDistance;
                         break;
                     }
 
@@ -984,6 +1012,7 @@ namespace CodeOfKutulu2
                         isFinished = true;
                         minDamageItem = di;
                         minFds = fds;
+                        minFriendDistance = friendDistance;
                         break;
                     }
 
@@ -998,16 +1027,17 @@ namespace CodeOfKutulu2
                 if (isFinished) continue;
 
                 //ближе к другу, если мы вне ауры
-                if (minFds.Values.Min() > AuraRange)
+                if (minFriendDistance > GetAuraRange(minFds, minFriendDistance))
                 {
-                    if (fds.Values.Min() < minFds.Values.Min())
+                    if (friendDistance < minFriendDistance)
                     {
                         minDamageItem = di;
                         minFds = fds;
+                        minFriendDistance = friendDistance;
                         continue;
                     }
                 }
-                else if (fds.Values.Min() > AuraRange) continue;//не выходим из ауры
+                else if (friendDistance > GetAuraRange(fds, friendDistance)) continue;//не выходим из ауры
 
                 //дальше от активных странников
                 index = 0;
@@ -1018,6 +1048,7 @@ namespace CodeOfKutulu2
                         isFinished = true;
                         minDamageItem = di;
                         minFds = fds;
+                        minFriendDistance = friendDistance;
                         break;
                     }
 
@@ -1040,6 +1071,7 @@ namespace CodeOfKutulu2
                         isFinished = true;
                         minDamageItem = di;
                         minFds = fds;
+                        minFriendDistance = friendDistance;
                         break;
                     }
 
@@ -1055,13 +1087,14 @@ namespace CodeOfKutulu2
                 if (isFinished) continue;
 
                 //ближе к другу, даже если в ауре
-                if (fds.Values.Min() < minFds.Values.Min())
+                if (friendDistance < minFriendDistance)
                 {
                     minDamageItem = di;
                     minFds = fds;
+                    minFriendDistance = friendDistance;
                     continue;
                 }
-                if (fds.Values.Min() > minFds.Values.Min()) continue;
+                if (friendDistance > minFriendDistance) continue;
 
                 //дальше от слэшеров
                 index = 0;
@@ -1072,6 +1105,7 @@ namespace CodeOfKutulu2
                         isFinished = true;
                         minDamageItem = di;
                         minFds = fds;
+                        minFriendDistance = friendDistance;
                         break;
                     }
 
@@ -1094,6 +1128,7 @@ namespace CodeOfKutulu2
                         isFinished = true;
                         minDamageItem = di;
                         minFds = fds;
+                        minFriendDistance = friendDistance;
                         break;
                     }
 
@@ -1107,13 +1142,14 @@ namespace CodeOfKutulu2
                 }
                 if (isFinished) continue;
 
-                //следующий ближайший дрг
-                var tmp = fds.Values.Where(d => d != fds.Values.Min());
+                //следующий ближайший друг
+                var tmp = fds.Values.Where(d => d != friendDistance);
                 var nextFd = tmp.Any() ? tmp.Min() : 0;
                 if (nextFd < nextMinFd)
                 {
                     minDamageItem = di;
                     minFds = fds;
+                    minFriendDistance = friendDistance;
                     continue;
                 }
                 if (nextFd > nextMinFd) continue;
@@ -1168,229 +1204,7 @@ namespace CodeOfKutulu2
 
             return null;//TODO: посторить путь до targetExplorer, если он есть
         }
-
-
-        static IDictionary<Point, int> GetSlasherDangerousPoints(IList<Explorer> allExplorers, IList<Wanderer> slashers, IList<Point> points, Explorer myExplorer)
-        {
-            var res = new Dictionary<Point, int>();
-            foreach (var slasher in slashers.Where(s => s.State == 3 || s.State == 2 && s.Time == 1 || s.State == 0 && s.Time == 1)) //TODO: State == 2
-            {
-                var slasherPoint = points.Single(p => p.X == slasher.X && p.Y == slasher.Y);
-
-                if (slasher.State == 2 && slasher.Time == 1 || slasher.State == 0 && slasher.Time == 1)
-                {
-                    var isMyExplorerVisible = IsVisblePoint(slasher, myExplorer.X, myExplorer.Y);
-                    if (isMyExplorerVisible)
-                    {
-                        Point n1 = null, n2 = null;
-                        if (slasher.Y == myExplorer.Y)
-                        {
-                            n1 = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y - 1);
-                            n2 = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y + 1);
-                        }
-                        else
-                        {
-                            n1 = points.Single(p => p.Y == myExplorer.Y && p.X == myExplorer.X - 1);
-                            n2 = points.Single(p => p.Y == myExplorer.Y && p.X == myExplorer.X + 1);
-                        }
-                        var canIHide = n1.Weight < BigValue || n2.Weight < BigValue;
-                        if (!canIHide)
-                        {
-                            var myExplorerePoint = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y);
-                            if (!res.ContainsKey(myExplorerePoint)) res.Add(myExplorerePoint, 0);
-                            res[myExplorerePoint]++;
-                        }
-
-                    }
-                    continue;
-                }
-
-                //TODO: just after spawn
-                var targetExplorer = allExplorers.SingleOrDefault(e => e.Id == slasher.TargetId);
-                var isVisible = targetExplorer != null && IsVisblePoint(slasher, targetExplorer.X, targetExplorer.Y);
-                var canHide = false;
-                if (targetExplorer != null && isVisible)
-                {
-                    Point n1 = null, n2 = null;
-                    if (slasher.Y == targetExplorer.Y)
-                    {
-                        n1 = points.Single(p => p.X == targetExplorer.X && p.Y == targetExplorer.Y - 1);
-                        n2 = points.Single(p => p.X == targetExplorer.X && p.Y == targetExplorer.Y + 1);
-                    }
-                    else
-                    {
-                        n1 = points.Single(p => p.Y == targetExplorer.Y && p.X == targetExplorer.X - 1);
-                        n2 = points.Single(p => p.Y == targetExplorer.Y && p.X == targetExplorer.X + 1);
-                    }
-
-                    canHide = n1.Weight < BigValue || n2.Weight < BigValue;
-                }
-
-                if (targetExplorer == null || slasher.TargetId == myExplorer.Id || !isVisible || canHide) //почемаем все точки на LOS опасными
-                {
-                    var currPoint = slasherPoint;
-                    if (!res.ContainsKey(currPoint)) res.Add(currPoint, 0);
-                    res[currPoint]++;
-
-                    currPoint = slasherPoint;
-                    while (true)
-                    {
-                        currPoint = points.SingleOrDefault(p => p.X == currPoint.X - 1 && p.Y == currPoint.Y && p.Weight < BigValue);
-                        if (currPoint == null) break;
-                        if (!res.ContainsKey(currPoint)) res.Add(currPoint, 0);
-                        res[currPoint]++;
-                    }
-                    currPoint = slasherPoint;
-                    while (true)
-                    {
-                        currPoint = points.SingleOrDefault(p => p.X == currPoint.X + 1 && p.Y == currPoint.Y && p.Weight < BigValue);
-                        if (currPoint == null) break;
-                        if (!res.ContainsKey(currPoint)) res.Add(currPoint, 0);
-                        res[currPoint]++;
-                    }
-
-                    currPoint = slasherPoint;
-                    while (true)
-                    {
-                        currPoint = points.SingleOrDefault(p => p.X == currPoint.X && p.Y == currPoint.Y - 1 && p.Weight < BigValue);
-                        if (currPoint == null) break;
-                        if (!res.ContainsKey(currPoint)) res.Add(currPoint, 0);
-                        res[currPoint]++;
-                    }
-                    currPoint = slasherPoint;
-                    while (true)
-                    {
-                        currPoint = points.SingleOrDefault(p => p.X == currPoint.X && p.Y == currPoint.Y + 1 && p.Weight < BigValue);
-                        if (currPoint == null) break;
-                        if (!res.ContainsKey(currPoint)) res.Add(currPoint, 0);
-                        res[currPoint]++;
-                    }
-
-                    //if (!SlasherTargets.ContainsKey(slasher.Id)) continue;
-                    //targetExplorer = allExplorers.SingleOrDefault(e => e.Id == SlasherTargets[slasher.Id]);
-                    //if (targetExplorer == null) continue;
-
-                    //var targetExplorerPoint = points.Single(p => p.X == targetExplorer.X && p.Y == targetExplorer.Y);
-                    //var path = Calculator.GetPath(slasherPoint, targetExplorerPoint, points);//TODO: путь м.б. неверным
-
-                    //if (path.Count == 1)
-                    //{
-                    //    if (!res.ContainsKey(slasherPoint)) res.Add(slasherPoint, 0);
-                    //    res[slasherPoint]++;
-                    //}
-                    //else
-                    //{
-                    //    var index = 1;
-                    //    var currPoint = path[index] as Point;
-
-                    //    while (true)
-                    //    {
-                    //        var newIndex = index + 1;
-                    //        if (newIndex > path.Count - 1) break;
-
-                    //        var newPoint = path[newIndex] as Point;
-                    //        if (newPoint.X != slasherPoint.X || newPoint.Y != slasherPoint.Y) break;
-
-                    //        currPoint = newPoint;
-                    //    }
-
-                    //    if (!res.ContainsKey(currPoint)) res.Add(currPoint, 0);
-                    //    res[currPoint]++;
-                    //}
-                    //continue;
-                }
-
-                
-                //var targetPoint = points.Single(p => p.X == targetExplorer.X && p.Y == targetExplorer.Y);
-
-                //var sPath = Calculator.GetPath(slasherPoint, targetPoint, points);
-                //if (sPath.Count == 1)
-                //{
-                //    if (!res.ContainsKey(slasherPoint)) res.Add(slasherPoint, 1);
-                //    continue;
-                //}
-
-                //Point nextStep = sPath[1] as Point;
-               
-                ////помечаем все точки на LoS слэшера
-                //if (nextStep.X != slasher.X)
-                //{
-                //    var currPoint = slasherPoint;
-                //    while (currPoint != null)
-                //    {
-                //        if (!res.ContainsKey(currPoint)) res.Add(currPoint, 0);
-                //        res[currPoint]++;
-                //        currPoint = points.SingleOrDefault(p => p.X == currPoint.X - 1 && p.Y == currPoint.Y && p.Weight < BigValue);
-                //    }
-                //    currPoint = slasherPoint;
-                //    while (currPoint != null)
-                //    {
-                //        if (!res.ContainsKey(currPoint)) res.Add(currPoint, 0);
-                //        res[currPoint]++;
-                //        currPoint = points.SingleOrDefault(p => p.X == currPoint.X + 1 && p.Y == currPoint.Y && p.Weight < BigValue);
-                //    }
-                //}
-                //else
-                //{
-                //    var currPoint = slasherPoint;
-                //    while (currPoint != null)
-                //    {
-                //        if (!res.ContainsKey(currPoint)) res.Add(currPoint, 0);
-                //        res[currPoint]++;
-                //        currPoint = points.SingleOrDefault(p => p.X == currPoint.X && p.Y == currPoint.Y - 1 && p.Weight < BigValue);
-                //    }
-                //    currPoint = slasherPoint;
-                //    while (currPoint != null)
-                //    {
-                //        if(!res.ContainsKey(currPoint)) res.Add(currPoint, 0);
-                //        res[currPoint]++;
-                //        currPoint = points.SingleOrDefault(p => p.X == currPoint.X && p.Y == currPoint.Y + 1 && p.Weight < BigValue);
-                //    }
-                //}
-
-
-                //TODO!!!
-                //var slasherTargetCellPoint = GetSlasherTargetPoint(slasher, allExplorers);
-                //if (slasherTargetCellPoint != null)
-                //{
-                //    var slasherTargetPoint = points.Single(p =>
-                //        p.X == slasherTargetCellPoint.X && p.Y == slasherTargetCellPoint.Y);
-                //    if (!res.ContainsKey(slasherTargetPoint)) res.Add(slasherTargetPoint, 0);
-                //    res[slasherTargetPoint]++;
-                //}
-
-                
-
-                //if (res.ContainsKey(targetPoint))
-                //    res[targetPoint]++;//текущую точку прыжка делаем самой опасной
-                //else
-                //{
-                //    Explorer nearestLosExplorer = null;
-                //    var minDist = int.MaxValue;
-                //    foreach (var explorer in allExplorers.Where(e => e.X == slasher.X || e.Y == slasher.Y))
-                //    {
-                //        var dist = GetManhattenDist(explorer, slasher);
-                //        if (dist < minDist)
-                //        {
-                //            minDist = dist;
-                //            nearestLosExplorer = explorer;
-                //        }
-                //    }
-
-                //    if (nearestLosExplorer != null)
-                //    {
-                //        var nearestLosExplorerPoint =
-                //            points.Single(p => p.X == nearestLosExplorer.X && p.Y == nearestLosExplorer.Y);
-                //        if (!res.ContainsKey(nearestLosExplorerPoint)) res.Add(nearestLosExplorerPoint, 0);
-                //        res[nearestLosExplorerPoint]++;
-                //    }
-
-                //}
-            }
-
-            return res;
-        }
-
+        
         static bool UsePlan(
             Explorer myExplorer,
             IList<Explorer> allExplorers)
@@ -1899,6 +1713,42 @@ namespace CodeOfKutulu2
                     var newSlasher = new Wanderer(slasher.Id, slasher.X, slasher.Y, newTime, newState, newTargetExplorerId);
                     newSlashers.Add(newSlasher);
                 }
+                //else if (slasher.State == 1)
+                //{
+                //    var explorerDists = new Dictionary<Explorer, int>();
+                //    var startPoint = PointsTable[slasher.X, slasher.Y];
+                //    foreach (var e in explorers)
+                //    {
+                //        var finalPoint = PointsTable[e.X, e.Y];
+                //        var path = Pathes[startPoint][finalPoint];
+                //        var dist = path.Count;
+                //        explorerDists.Add(e, dist);
+                //    }
+
+                //    var minDist = explorerDists.Values.Min();
+                //    var nearestExplorers = explorerDists.Keys.Where(e => explorerDists[e] == minDist);
+                //    var visibleExplorers = nearestExplorers.Where(e => IsVisblePoint(slasher, e.X, e.Y));
+
+                //    var targetExplorer = visibleExplorers.FirstOrDefault();
+                //    if (targetExplorer != null)
+                //    {
+                //        var newSlasher = new Wanderer(slasher.Id, slasher.X, slasher.Y, 2, 2, targetExplorer.Id);
+                //        newSlashers.Add(newSlasher);
+                //    }
+                //    else
+                //    {
+                //        var nearestExplorer = nearestExplorers.First();
+                //        var finalPoint = PointsTable[nearestExplorer.X, nearestExplorer.Y];
+                //        var path = Pathes[startPoint][finalPoint];
+
+                //        var x = path.Count == 1 ? nearestExplorer.X : (path[1] as Point).X;
+                //        var y = path.Count == 1 ? nearestExplorer.Y : (path[1] as Point).Y;
+
+                //        var newSlasher = new Wanderer(slasher.Id, x, y, slasher.Time, 1, nearestExplorer.Id);
+                //        newSlashers.Add(newSlasher);
+                //    }
+
+                //}
             }
 
             return newSlashers;
@@ -1948,7 +1798,7 @@ namespace CodeOfKutulu2
         private const int LightRange = 5;
         private const int LightCooldown = 3;
 
-        private const int AuraRange = 2;
+        private const int FriendAuraRange = 2;
 
         private const int ShelterDefaultEnergy = 10;
         private const int MaxShelterEnergyLeak = 3;

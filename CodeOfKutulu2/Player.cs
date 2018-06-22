@@ -954,6 +954,8 @@ namespace CodeOfKutulu2
                 }
 
                 var friendDistance = fds.Values.Min();
+                var tmp = fds.Values.Where(d => d != friendDistance);
+                var nextFd = tmp.Any() ? tmp.Min() : 0;
 
                 //var wandererDist = walkingWanderers.Any() ? walkingWanderers.Min(w =>
                 //    GetManhattenDist(w.X, w.Y, di.Point.X, di.Point.Y)) : 0;
@@ -968,6 +970,7 @@ namespace CodeOfKutulu2
                     minDamageItem = di;
                     minFds = fds;
                     minFriendDistance = friendDistance;
+                    nextMinFd = nextFd;
                     continue;
                 }
                 if (di.SumDamage > minDamageItem.SumDamage) continue;
@@ -985,6 +988,7 @@ namespace CodeOfKutulu2
                         minDamageItem = di;
                         minFds = fds;
                         minFriendDistance = friendDistance;
+                        nextMinFd = nextFd;
                         break;
                     }
 
@@ -1013,6 +1017,7 @@ namespace CodeOfKutulu2
                         minDamageItem = di;
                         minFds = fds;
                         minFriendDistance = friendDistance;
+                        nextMinFd = nextFd;
                         break;
                     }
 
@@ -1034,10 +1039,12 @@ namespace CodeOfKutulu2
                         minDamageItem = di;
                         minFds = fds;
                         minFriendDistance = friendDistance;
+                        nextMinFd = nextFd;
                         continue;
                     }
+                    if (friendDistance > minFriendDistance) continue;
                 }
-                else if (friendDistance > GetAuraRange(fds, friendDistance)) continue;//не выходим из ауры
+                //else if (friendDistance > GetAuraRange(fds, friendDistance)) continue;//не выходим из ауры
 
                 //дальше от активных странников
                 index = 0;
@@ -1049,6 +1056,7 @@ namespace CodeOfKutulu2
                         minDamageItem = di;
                         minFds = fds;
                         minFriendDistance = friendDistance;
+                        nextMinFd = nextFd;
                         break;
                     }
 
@@ -1072,6 +1080,7 @@ namespace CodeOfKutulu2
                         minDamageItem = di;
                         minFds = fds;
                         minFriendDistance = friendDistance;
+                        nextMinFd = nextFd;
                         break;
                     }
 
@@ -1092,6 +1101,7 @@ namespace CodeOfKutulu2
                     minDamageItem = di;
                     minFds = fds;
                     minFriendDistance = friendDistance;
+                    nextMinFd = nextFd;
                     continue;
                 }
                 if (friendDistance > minFriendDistance) continue;
@@ -1106,6 +1116,7 @@ namespace CodeOfKutulu2
                         minDamageItem = di;
                         minFds = fds;
                         minFriendDistance = friendDistance;
+                        nextMinFd = nextFd;
                         break;
                     }
 
@@ -1129,6 +1140,7 @@ namespace CodeOfKutulu2
                         minDamageItem = di;
                         minFds = fds;
                         minFriendDistance = friendDistance;
+                        nextMinFd = nextFd;
                         break;
                     }
 
@@ -1143,13 +1155,12 @@ namespace CodeOfKutulu2
                 if (isFinished) continue;
 
                 //следующий ближайший друг
-                var tmp = fds.Values.Where(d => d != friendDistance);
-                var nextFd = tmp.Any() ? tmp.Min() : 0;
                 if (nextFd < nextMinFd)
                 {
                     minDamageItem = di;
                     minFds = fds;
                     minFriendDistance = friendDistance;
+                    nextMinFd = nextFd;
                     continue;
                 }
                 if (nextFd > nextMinFd) continue;

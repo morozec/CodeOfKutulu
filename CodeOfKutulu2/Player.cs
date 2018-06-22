@@ -696,7 +696,7 @@ namespace CodeOfKutulu2
                     // game loop
             while (true)
             {
-                //var watch = System.Diagnostics.Stopwatch.StartNew();
+                var watch = System.Diagnostics.Stopwatch.StartNew();
 
                 var points = GetPointsCopy();
                 if (CurrentPlanCooldown > 0) CurrentPlanCooldown--;
@@ -833,7 +833,7 @@ namespace CodeOfKutulu2
                 //{
                 //    var isCurrPointSafe = startPoint.Weight <= escapePoint.Weight;
                 //    var shouldStay = escapePoint.X == myExplorer.X && escapePoint.Y == myExplorer.Y;
-                    
+
 
                 //    if (shouldStay || isCurrPointSafe)
                 //    {
@@ -860,7 +860,7 @@ namespace CodeOfKutulu2
                 //            continue;
                 //        }
                 //    }
-                    
+
                 //    if (shouldStay)
                 //    {
                 //        //Console.Error.WriteLine("Curr point is most safety");
@@ -879,8 +879,9 @@ namespace CodeOfKutulu2
                 //}
 
 
-                //watch.Stop();
-                //var elapsedMs = watch.ElapsedMilliseconds;
+                watch.Stop();
+                var elapsedMs = watch.ElapsedMilliseconds;
+                Console.Error.WriteLine(elapsedMs);
             }
         }
 
@@ -1378,7 +1379,7 @@ namespace CodeOfKutulu2
 
         private static IList<DamageItem> GetDamageItems(Explorer myExplorer, IList<Explorer> explorers, IList<Wanderer> wanderers, IList<Wanderer> slashers)
         {
-            var damageItems = GetDamageItemsRec(myExplorer, explorers, wanderers, slashers, ExplorerPoints[myExplorer.Id], 0);
+            var damageItems = GetDamageItemsRec(myExplorer, explorers, wanderers.Where(w => w.State == 1).ToList(), slashers, ExplorerPoints[myExplorer.Id], 0);
             foreach (var di in damageItems)
             {
                 Console.Error.WriteLine($"{di.Point.X} {di.Point.Y} {di.SumDamage} {di.Damage} {di.MinWandererDist} {di.MinWandererDistCount} {di.MinSlashersDist} {di.MinSlashersDistCount}");
@@ -1470,10 +1471,18 @@ namespace CodeOfKutulu2
                 var explorerPoint = PointsTable[explorer.X, explorer.Y]; 
                 var neighbours = explorerPoint.GetNeighbors(Points);
                 var minDamagePoint = explorerPoint;
-                var minDamage = wanderers.Count(w => GetManhattenDist(w, explorer) <= 1);
-                var walkingWanderers = wanderers.Where(w => w.State == 1);
-                var minWanderersDist = walkingWanderers.Any()
-                    ? walkingWanderers.Min(w => GetManhattenDist(w.X, w.Y, minDamagePoint.X, minDamagePoint.Y)) : 0;
+
+                var minDamage = 0;
+                var minWanderersDist = int.MaxValue;
+                foreach (var w in wanderers)
+                {
+                    var dist = GetManhattenDist(w, explorer);
+                    if (dist <= 1)
+                        minDamage++;
+                    if (dist < minWanderersDist)
+                        minWanderersDist = dist;
+                }
+
                 var minVisibleSlashers = slashers.Count(s => IsVisblePoint(s, minDamagePoint.X, minDamagePoint.Y));
 
                 foreach (var slasher in slashers.Where(s => s.State == 3)) //Не проверяем TargetId - считаем, что целевой эксплорер может уйти
@@ -1484,9 +1493,17 @@ namespace CodeOfKutulu2
                 foreach (Point n in neighbours)
                 {
                     if (n.Weight == BigValue) continue;
-                    var damage = wanderers.Count(w => GetManhattenDist(w.X, w.Y, n.X, n.Y) <= 1);
-                    var wanderersDist = walkingWanderers.Any()
-                        ? walkingWanderers.Min(w => GetManhattenDist(w.X, w.Y, n.X, n.Y)) : 0;
+                    var damage = 0;
+                    var wanderersDist = int.MaxValue;
+                    foreach (var w in wanderers)
+                    {
+                        var dist = GetManhattenDist(w.X, w.Y, n.X, n.Y);
+                        if (dist <= 1)
+                            damage++;
+                        if (dist < wanderersDist)
+                            wanderersDist = dist;
+                    }
+
                     var visibleSlashers = slashers.Count(s => IsVisblePoint(s, n.X, n.Y));
 
                     foreach (var slasher in slashers.Where(s => s.State == 3))
@@ -1819,6 +1836,7 @@ namespace CodeOfKutulu2
 
         //private static IDictionary<APoint, ExpansionMatrixConteiner> Ems;
         private static IDictionary<Point, IDictionary<Point, IList<APoint>>> Pathes;
+        //private static IList<APoint>[,][,] Arr;
 
         #endregion
 

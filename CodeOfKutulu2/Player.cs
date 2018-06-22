@@ -2,6 +2,7 @@
 using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Remoting.Messaging;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
@@ -48,22 +49,25 @@ namespace CodeOfKutulu2
 
             public char Value { get; set; }
 
+            public IEnumerable<APoint> Neighbours { get; set; }
+
             public override IEnumerable<APoint> GetNeighbors(IEnumerable<APoint> apoints)
             {
-                var resPoints = new List<Point>();
-                foreach (var apoint in apoints)
-                {
-                    var point = (Point)apoint;
-                    if (point.Y == Y && (point.X == X - 1 || point.X == X + 1))
-                    {
-                        resPoints.Add(point);
-                    }
-                    else if (point.X == X && (point.Y == Y - 1 || point.Y == Y + 1))
-                    {
-                        resPoints.Add(point);
-                    }
-                }
-                return resPoints;
+                return Neighbours;
+                //var resPoints = new List<Point>();
+                //foreach (var apoint in apoints)
+                //{
+                //    var point = (Point)apoint;
+                //    if (point.Y == Y && (point.X == X - 1 || point.X == X + 1))
+                //    {
+                //        resPoints.Add(point);
+                //    }
+                //    else if (point.X == X && (point.Y == Y - 1 || point.Y == Y + 1))
+                //    {
+                //        resPoints.Add(point);
+                //    }
+                //}
+                //return resPoints;
             }
 
             public override double GetHeuristicCost(APoint agoal)
@@ -207,7 +211,7 @@ namespace CodeOfKutulu2
             /// <param name="startPoints">����� ��������� �����</param>
             /// <param name="allPoints">��� ����� ����</param>
             /// <returns>������� ��������������� ��� ��������� �����</returns>
-            private static IDictionary<APoint, ExpansionMatrixConteiner> GetExpansionMatrices(IEnumerable<APoint> startPoints, IEnumerable<APoint> allPoints)
+            public static IDictionary<APoint, ExpansionMatrixConteiner> GetExpansionMatrices(IEnumerable<APoint> startPoints, IEnumerable<APoint> allPoints)
             {
                 var result = new Dictionary<APoint, ExpansionMatrixConteiner>();
                 foreach (var startPoint in startPoints)
@@ -437,7 +441,7 @@ namespace CodeOfKutulu2
                 return resultList;
             }
 
-            private static IList<APoint> ReconstructPath(APoint goal, ExpansionMatrixConteiner expansionMatrixConteiner, IEnumerable<APoint> allPoints)
+            public static IList<APoint> ReconstructPath(APoint goal, ExpansionMatrixConteiner expansionMatrixConteiner, IEnumerable<APoint> allPoints)
             {
                 var path = new List<APoint>() { goal };
                 var currentPoint = goal;
@@ -527,6 +531,43 @@ namespace CodeOfKutulu2
 
         #endregion
 
+
+        private class DamageItem
+        {
+            public Point Point { get; set; }
+            public int Damage { get; set; }
+            public IList<DamageItem> DamageChildren { get; set; }
+
+            public int MinWandererDist { get; set; }
+            public int MinWandererDistCount { get; set; }
+
+            public int MinSlashersDist { get; set; }
+            public int MinSlashersDistCount { get; set; }
+
+            public int SumDamage => GetMinDamagePath().Sum(di => di.Damage);
+
+            public IList<DamageItem> GetMinDamagePath()
+            {
+                var path = new List<DamageItem>(){this};
+                if (!DamageChildren.Any()) return path;
+
+                var minChildSumDamage = int.MaxValue;
+                IList<DamageItem> minChildSumDamagePath = null;
+                foreach (var child in DamageChildren)
+                {
+                    var childPath = child.GetMinDamagePath();
+                    var childSumDamage = childPath.Sum(c => c.Damage);
+                    if (childSumDamage < minChildSumDamage)
+                    {
+                        minChildSumDamage = childSumDamage;
+                        minChildSumDamagePath = childPath;
+                    }
+                }
+                path.AddRange(minChildSumDamagePath);
+                return path;
+            }
+        }
+
         static int GetManhattenDist(int x1, int y1, int x2, int y2)
         {
             return Math.Abs(x1 - x2) + Math.Abs(y1 - y2);
@@ -539,27 +580,43 @@ namespace CodeOfKutulu2
 
         private static IList<Point> GetPointsCopy()
         {
+
             var res = new List<Point>();
             foreach (var point in Points)
-                res.Add(new Point() { X = point.X, Y = point.Y, Weight = point.Weight });
+            {
+                var pointCopy = new Point() {X = point.X, Y = point.Y, Weight = point.Weight};
+                res.Add(pointCopy);
+            }
+
+            foreach (var point in res)
+            {
+                point.Neighbours = res.Where(p =>
+                    p.X == point.X && p.Y == point.Y - 1 ||
+                    p.X == point.X && p.Y == point.Y + 1 ||
+                    p.Y == point.Y && p.X == point.X - 1 ||
+                    p.Y == point.Y && p.X == point.X + 1);
+            }
+
             return res;
         }
+
 
         static void Main(string[] args)
         {
             string[] inputs;
             int width = int.Parse(Console.ReadLine());
-            //Console.Error.WriteLine(width);
+            Console.Error.WriteLine(width);
             int height = int.Parse(Console.ReadLine());
-            //Console.Error.WriteLine(height);
+            Console.Error.WriteLine(height);
 
             Points = new List<Point>();
+            PointsTable = new Point[width, height];
             Point startPoint = null, finalPoint = null;
 
             for (int i = 0; i < height; i++)
             {
                 string line = Console.ReadLine();
-                //Console.Error.WriteLine(line);
+                Console.Error.WriteLine(line);
                 for (int j = 0; j < line.Length; ++j)
                 {
                     var ch = line[j];
@@ -575,12 +632,26 @@ namespace CodeOfKutulu2
                     point.Weight = weight;
 
                     Points.Add(point);
+                    PointsTable[j, i] = point;
+                }
+            }
 
+            for (int i = 0; i < height; ++i)
+            {
+                for (int j = 0; j < width; ++j)
+                {
+                    var point = PointsTable[j, i];
+                    var neighbours = new List<Point>();
+                    if (i > 0) neighbours.Add(PointsTable[j,i-1]);
+                    if (i < height - 1) neighbours.Add(PointsTable[j,i + 1]);
+                    if (j > 0) neighbours.Add(PointsTable[j - 1, i]);
+                    if (j < width - 1) neighbours.Add(PointsTable[j + 1, i]);
+                    point.Neighbours = neighbours;
                 }
             }
 
             var str = Console.ReadLine();
-            //Console.Error.WriteLine(str);
+            Console.Error.WriteLine(str);
             inputs = str.Split(' ');
 
             int sanityLossLonely =
@@ -598,9 +669,15 @@ namespace CodeOfKutulu2
             WandererSpawnTime = wandererSpawnTime;
             WandererLifeTime = wandererLifeTime;
 
+
+            Ems = Calculator.GetExpansionMatrices(Points, Points);
+            //var path = Calculator.ReconstructPath(Points[10], ems[Points[0]], Points);
+           
             // game loop
             while (true)
             {
+                //var watch = System.Diagnostics.Stopwatch.StartNew();
+
                 var points = GetPointsCopy();
                 if (CurrentPlanCooldown > 0) CurrentPlanCooldown--;
                 if (CurrentLightCooldown > 0) CurrentLightCooldown--;
@@ -616,12 +693,12 @@ namespace CodeOfKutulu2
                 IList<Shelter> shelters = new List<Shelter>();
 
                 str = Console.ReadLine();
-                //Console.Error.WriteLine(str);
+                Console.Error.WriteLine(str);
                 int entityCount = int.Parse(str); // the first given entity corresponds to your explorer
                 for (int i = 0; i < entityCount; i++)
                 {
                     str = Console.ReadLine();
-                    //Console.Error.WriteLine(str);
+                    Console.Error.WriteLine(str);
                     inputs = str.Split(' ');
                     string entityType = inputs[0];
                     int id = int.Parse(inputs[1]);
@@ -641,19 +718,19 @@ namespace CodeOfKutulu2
                         }
 
                         allExplorers.Add(explorer);
-                        ExplorerPoints.Add(explorer.Id, Points.Single(p => p.X == explorer.X && p.Y == explorer.Y));
+                        ExplorerPoints.Add(explorer.Id, PointsTable[explorer.X, explorer.Y]);
                     }
                     else if (entityType == "WANDERER")
                     {
                         var wanderer = new Wanderer(id, x, y, param0, param1, param2);
                         wanderers.Add(wanderer);
-                        WandererPoints.Add(wanderer.Id, Points.Single(p => p.X == wanderer.X && p.Y == wanderer.Y));
+                        WandererPoints.Add(wanderer.Id, PointsTable[wanderer.X, wanderer.Y]);
                     }
                     else if (entityType == "SLASHER")
                     {
                         var slaher = new Wanderer(id, x, y, param0, param1, param2);
                         slashers.Add(slaher);
-                        SlasherPoints.Add(slaher.Id, Points.Single(p => p.X == slaher.X && p.Y == slaher.Y));
+                        SlasherPoints.Add(slaher.Id, PointsTable[slaher.X, slaher.Y]);
                     }
                     else if (entityType == "EFFECT_SHELTER")
                     {
@@ -669,99 +746,128 @@ namespace CodeOfKutulu2
                     continue;
                 }
 
-                UpdateSlasherTargets(slashers);
 
-                var slasherDangerousPoints = GetSlasherDangerousPoints(allExplorers, slashers, points, myExplorer);
-                var wandererDangerousPoints = GetWandererDangerousPoints(myExplorer, wanderers, points);
+                UpdateSlasherTargets(slashers, allExplorers);
 
-                //var isMyCellDangerous = slasherDangerousPoints.Keys.Any(p => p.X == myExplorer.X && p.Y == myExplorer.Y) ||
-                //                        wandererDangerousPoints.Keys.Any(p => p.X == myExplorer.X && p.Y == myExplorer.Y);
+                //var slasherDangerousPoints = GetSlasherDangerousPoints(allExplorers, slashers, points, myExplorer);
+                //var wandererDangerousPoints = GetWandererDangerousPoints(myExplorer, wanderers, points);
 
+                //foreach (var sdp in slasherDangerousPoints.Keys)
+                //{
+                //    sdp.Weight += SlasherWeight * slasherDangerousPoints[sdp];
+                //}
 
-                foreach (var sdp in slasherDangerousPoints.Keys)
-                {
-                    //if (sdp.X == myExplorer.X && sdp.Y == myExplorer.Y)
-                    //    continue; //не помечаем свою ячейку неппроходимой
-                    sdp.Weight += SlasherWeight * slasherDangerousPoints[sdp];
-                }
+                //foreach (var wdp in wandererDangerousPoints.Keys)
+                //{
+                //    wdp.Weight += WandererWeight * wandererDangerousPoints[wdp];
+                //}
 
-                foreach (var wdp in wandererDangerousPoints.Keys)
-                {
-                    //if (wdp.X == myExplorer.X && wdp.Y == myExplorer.Y)
-                    //    continue; //не помечаем свою ячейку непроходимой
-                    wdp.Weight += WandererWeight * wandererDangerousPoints[wdp];
-                }
-
-                var goPoint = GetGoPoint(myExplorer, allExplorers, shelters, points);
-                finalPoint = points.Single(p => p.X == goPoint.X && p.Y == goPoint.Y);
-                var path = Calculator.GetPath(startPoint, finalPoint, points);
+                //var goPoint = GetGoPoint(myExplorer, allExplorers, shelters, points);
+                //finalPoint = points.Single(p => p.X == goPoint.X && p.Y == goPoint.Y);
+                //var path = Calculator.GetPath(startPoint, finalPoint, points);
 
                 //Console.Error.WriteLine($"{startPoint.X} {startPoint.Y} {startPoint.Weight}");
                 //foreach (Point neighbour in startPoint.GetNeighbors(points))
                 //    if (neighbour.Weight < BigValue)
                 //        Console.Error.WriteLine($"{neighbour.X} {neighbour.Y} {neighbour.Weight}");
-
                 
-                var escapePoint = GetEscapePoint(startPoint, points, allExplorers, wanderers, slashers, myExplorer.Id);
-                var isBetterToHide = path.Count > 1 && escapePoint.Weight < (path[1] as Point).Weight;//опасно идти за эксплорером
-
-                var auraRange = goPoint is Shelter ? 0 : AuraRange;
-                var goPointDist = GetManhattenDist(myExplorer, goPoint);
-                if (goPointDist <= auraRange || isBetterToHide)
+                
+                var escapePoint = GetNewEscapePoint(myExplorer, allExplorers, wanderers, slashers);
+                if (escapePoint.X == myExplorer.X && escapePoint.Y == myExplorer.Y)
                 {
-                    var isCurrPointSafe = startPoint.Weight <= escapePoint.Weight;
-                    //TODO: из-за isCurrPointSafe shouldStay сработает, даже если выгоднее другая точка
-                    var shouldStay = escapePoint.X == myExplorer.X && escapePoint.Y == myExplorer.Y;
-
-                   
-
-                    if (shouldStay || isCurrPointSafe)
+                    var useYell = UseYell(myExplorer, allExplorers, wanderers, slashers);
+                    var usePlan = UsePlan(myExplorer, allExplorers);
+                    var useLight = UseLight(myExplorer, allExplorers, wanderers);
+                    if (useYell)
                     {
-                        var useYell = UseYell(myExplorer, allExplorers, wanderers, slashers);
-                        var usePlan = UsePlan(myExplorer, allExplorers);
-                        var useLight = UseLight(myExplorer, allExplorers, wanderers);
-                        if (useYell)
-                        {
-                            IsYellUsed = true;
-                            Console.WriteLine("YELL yell!!!");
-                            continue;
-                        }
-                        if (usePlan)
-                        {
-                            Console.WriteLine("PLAN");
-                            continue;
-                        }
+                        IsYellUsed = true;
+                        Console.WriteLine("YELL yell!!!");
+                        continue;
+                    }
+                    if (usePlan)
+                    {
+                        CurrentPlanCooldown = PlanCooldown + 1;
+                        Console.WriteLine("PLAN");
+                        continue;
+                    }
 
-                        if (useLight)
-                        {
-                            Console.WriteLine("LIGHT");
-                            continue;
-                        }
-                    }
-                    
-                    if (shouldStay)
+                    if (useLight)
                     {
-                        //Console.Error.WriteLine("Curr point is most safety");
-                        Console.WriteLine("WAIT");
+                        CurrentLightCooldown = LightCooldown + 1;
+                        Console.WriteLine("LIGHT");
+                        continue;
                     }
-                    else
-                    {
-                        //Console.Error.WriteLine("Time to run");
-                        Console.WriteLine("MOVE " + escapePoint.X + " " + escapePoint.Y);
-                    }
+                    Console.WriteLine("WAIT");
                 }
                 else
                 {
-                    var step = path[1] as Point;
-                    Console.WriteLine("MOVE " + step.X + " " + step.Y);
+                    Console.WriteLine($"MOVE {escapePoint.X} {escapePoint.Y}");
                 }
+
+
+                //var isBetterToHide = path.Count > 1 && escapePoint.Weight < (path[1] as Point).Weight;//опасно идти за эксплорером
+
+                //var auraRange = goPoint is Shelter ? 0 : AuraRange;
+                //var goPointDist = GetManhattenDist(myExplorer, goPoint);
+                //if (goPointDist <= auraRange || isBetterToHide)
+                //{
+                //    var isCurrPointSafe = startPoint.Weight <= escapePoint.Weight;
+                //    var shouldStay = escapePoint.X == myExplorer.X && escapePoint.Y == myExplorer.Y;
+                    
+
+                //    if (shouldStay || isCurrPointSafe)
+                //    {
+                //        var useYell = UseYell(myExplorer, allExplorers, wanderers, slashers);
+                //        var usePlan = UsePlan(myExplorer, allExplorers);
+                //        var useLight = UseLight(myExplorer, allExplorers, wanderers);
+                //        if (useYell)
+                //        {
+                //            IsYellUsed = true;
+                //            Console.WriteLine("YELL yell!!!");
+                //            continue;
+                //        }
+                //        if (usePlan)
+                //        {
+                //            CurrentPlanCooldown = PlanCooldown + 1;
+                //            Console.WriteLine("PLAN");
+                //            continue;
+                //        }
+
+                //        if (useLight)
+                //        {
+                //            CurrentLightCooldown = LightCooldown + 1;
+                //            Console.WriteLine("LIGHT");
+                //            continue;
+                //        }
+                //    }
+                    
+                //    if (shouldStay)
+                //    {
+                //        //Console.Error.WriteLine("Curr point is most safety");
+                //        Console.WriteLine("WAIT");
+                //    }
+                //    else
+                //    {
+                //        //Console.Error.WriteLine("Time to run");
+                //        Console.WriteLine("MOVE " + escapePoint.X + " " + escapePoint.Y);
+                //    }
+                //}
+                //else
+                //{
+                //    var step = path[1] as Point;
+                //    Console.WriteLine("MOVE " + step.X + " " + step.Y);
+                //}
+
+
+                //watch.Stop();
+                //var elapsedMs = watch.ElapsedMilliseconds;
             }
         }
 
         static int GetWanderesCount(int x, int y, int myExplorerId, IList<Explorer> explorers, IList<Wanderer> wanderers)
         {
             var wanderesCount = 0;
-            var destPoint = Points.Single(p => p.X == x && p.Y == y);
+            var destPoint = PointsTable[x,y];
             foreach (var wanderer in wanderers.Where(w => w.State == 1))
             {
                 if (!WandererExplorerPathDistances.ContainsKey(wanderer.Id))
@@ -792,6 +898,211 @@ namespace CodeOfKutulu2
             }
 
             return wanderesCount;
+        }
+
+        static Point GetNewEscapePoint(Explorer myExplorer, IList<Explorer> allExplorers,
+            IList<Wanderer> wanderers, IList<Wanderer> slashers)
+        {
+            var damageItems = GetDamageItems(myExplorer, allExplorers, wanderers, slashers);
+            DamageItem minDamageItem = damageItems[0];
+
+
+            var startPoint = PointsTable[myExplorer.X, myExplorer.Y];
+            var minFriendDist = int.MaxValue;
+            foreach (var e in allExplorers)
+            {
+                var finalPoint = PointsTable[e.X, e.Y];
+                var path = Calculator.GetPath(startPoint, finalPoint, Points);
+                var dist = path.Count;
+                if (dist < minFriendDist)
+                {
+                    minFriendDist = dist;
+                }
+            }
+
+            //var minFriendDist = allExplorers.Where(e => e.Id != myExplorer.Id)
+            //    .Min(e => GetManhattenDist(e.X, e.Y, damageItems[0].Point.X, damageItems[0].Point.Y));
+
+            //var walkingWanderers = wanderers.Where(w => w.State == 1);
+            //var minWandererDist = walkingWanderers.Any() ? walkingWanderers.Min(w =>
+            //    GetManhattenDist(w.X, w.Y, minDamageItem.Point.X, minDamageItem.Point.Y)) : 0;
+            //var minWandererCount = walkingWanderers.Any()
+            //    ? walkingWanderers.Count(w =>
+            //        GetManhattenDist(w.X, w.Y, minDamageItem.Point.X, minDamageItem.Point.Y) == minWandererDist) : 0;
+            //var minDamage = int.MaxValue;
+            //var minFriendDistance = int.MaxValue;
+
+            for (int i = 1; i < damageItems.Count; ++i)
+            {
+                var di = damageItems[i];
+                //var friendDist = allExplorers.Where(e => e.Id != myExplorer.Id)
+                //    .Min(e => GetManhattenDist(e.X, e.Y, di.Point.X, di.Point.Y));
+                var currStartPoint = PointsTable[di.Point.X, di.Point.Y];
+                var friendDist = int.MaxValue;
+                foreach (var e in allExplorers)
+                {
+                    var finalPoint = PointsTable[e.X, e.Y];
+                    var path = Calculator.GetPath(currStartPoint, finalPoint, Points);
+                    var dist = path.Count;
+                    if (dist < friendDist)
+                    {
+                        friendDist = dist;
+                    }
+                }
+
+                //var wandererDist = walkingWanderers.Any() ? walkingWanderers.Min(w =>
+                //    GetManhattenDist(w.X, w.Y, di.Point.X, di.Point.Y)) : 0;
+                //var wandererCount = walkingWanderers.Any()
+                //    ? walkingWanderers.Count(w =>
+                //        GetManhattenDist(w.X, w.Y, di.Point.X, di.Point.Y) == wandererDist) : 0;
+
+                //наименьший суммарный урон
+                if (di.SumDamage < minDamageItem.SumDamage)
+                {
+                    minDamageItem = di;
+                    minFriendDist = friendDist;
+                    continue;
+                }
+                if (di.SumDamage > minDamageItem.SumDamage) continue;
+
+                //наиболее поздний урон
+                var index = 0;
+                var diPath = di.GetMinDamagePath();
+                var minDiPath = minDamageItem.GetMinDamagePath();
+                var isFinished = false;
+                while (index < minDiPath.Count)
+                {
+                    if (diPath[index].Damage < minDiPath[index].Damage)
+                    {
+                        isFinished = true;
+                        minDamageItem = di;
+                        minFriendDist = friendDist;
+                        break;
+                    }
+
+                    if (diPath[index].Damage > minDiPath[index].Damage)
+                    {
+                        isFinished = true;
+                        break;
+                    }
+
+                    index++;
+                }
+                if(isFinished) continue;
+
+                //ближе к другу, если мы вне ауры
+                if (minFriendDist > AuraRange)
+                {
+                    if (friendDist < minFriendDist)
+                    {
+                        minDamageItem = di;
+                        minFriendDist = friendDist;
+                        continue;
+                    }
+                }
+                else if (friendDist > AuraRange) continue;//не выходим из ауры
+
+                //дальше от активных странников
+                index = 0;
+                while (index < minDiPath.Count)
+                {
+                    if (di.MinWandererDist > minDamageItem.MinWandererDist)
+                    {
+                        isFinished = true;
+                        minDamageItem = di;
+                        minFriendDist = friendDist;
+                        break;
+                    }
+
+                    if (di.MinWandererDist < minDamageItem.MinWandererDist)
+                    {
+                        isFinished = true;
+                        break;
+                    }
+
+                    index++;
+                }
+                if (isFinished) continue;
+
+                //меньше активных странников
+                index = 0;
+                while (index < minDiPath.Count)
+                {
+                    if (di.MinWandererDistCount > minDamageItem.MinWandererDistCount)
+                    {
+                        isFinished = true;
+                        minDamageItem = di;
+                        minFriendDist = friendDist;
+                        break;
+                    }
+
+                    if (di.MinWandererDistCount < minDamageItem.MinWandererDistCount)
+                    {
+                        isFinished = true;
+                        break;
+                    }
+
+                    index++;
+                }
+                
+                if (isFinished) continue;
+
+                //ближе к другу, даже если в ауре
+                if (friendDist < minFriendDist)
+                {
+                    minDamageItem = di;
+                    minFriendDist = friendDist;
+                    continue;
+                }
+                if (friendDist > minFriendDist) continue;
+
+                //дальше от слэшеров
+                index = 0;
+                while (index < minDiPath.Count)
+                {
+                    if (di.MinSlashersDist > minDamageItem.MinSlashersDist)
+                    {
+                        isFinished = true;
+                        minDamageItem = di;
+                        minFriendDist = friendDist;
+                        break;
+                    }
+
+                    if (di.MinSlashersDist < minDamageItem.MinSlashersDist)
+                    {
+                        isFinished = true;
+                        break;
+                    }
+
+                    index++;
+                }
+                if (isFinished) continue;
+
+                //меньше слэшеров
+                index = 0;
+                while (index < minDiPath.Count)
+                {
+                    if (di.MinSlashersDistCount > minDamageItem.MinSlashersDistCount)
+                    {
+                        isFinished = true;
+                        minDamageItem = di;
+                        minFriendDist = friendDist;
+                        break;
+                    }
+
+                    if (di.MinSlashersDistCount < minDamageItem.MinSlashersDistCount)
+                    {
+                        isFinished = true;
+                        break;
+                    }
+
+                    index++;
+                }
+                if (isFinished) continue;
+            }
+            
+
+            return minDamageItem.Point;
         }
 
         /// <summary>
@@ -977,12 +1288,28 @@ namespace CodeOfKutulu2
             {
                 var minY = Math.Min(source.Y, destY);
                 var maxY = Math.Max(source.Y, destY);
-                return Points.Where(p => p.X == source.X && p.Y > minY && p.Y < maxY).All(p => p.Weight < BigValue);
+                var currY = minY + 1;
+                while (currY < maxY)
+                {
+                    var point = PointsTable[source.X, currY];
+                    if (point.Weight == BigValue) return false;
+                    currY++;
+                }
+
+                return true;
             }
 
             var minX = Math.Min(source.X, destX);
             var maxX = Math.Max(source.X, destX);
-            return Points.Where(p => p.Y == source.Y && p.X > minX && p.X < maxX).All(p => p.Weight < BigValue);
+            var currX = minX + 1;
+            while (currX < maxX)
+            {
+                var point = PointsTable[currX, source.Y];
+                if (point.Weight == BigValue) return false;
+                currX++;
+            }
+
+            return true;
         }
 
         static CellPoint GetSlasherTargetPoint(Wanderer slasher, IList<Explorer> allExplorers)
@@ -1329,7 +1656,7 @@ namespace CodeOfKutulu2
                     if (path.Count <= 3) return true;
 
                     Point point2 = path[2] as Point;
-                    var afterLightWandererPoint = Points.Single(p => p.X == point2.X && p.Y == point2.Y);
+                    var afterLightWandererPoint = PointsTable[point2.X, point2.Y];
                     var afterLightExplorerPoint = ExplorerPoints[explorer.Id];
 
                     var afterLightMyPath = Calculator.GetPath(afterLightWandererPoint, noLightMyPoint, Points);
@@ -1371,29 +1698,351 @@ namespace CodeOfKutulu2
         }
 
 
-        private static void UpdateSlasherTargets(IList<Wanderer> slashers)
+        private static void UpdateSlasherTargets(IList<Wanderer> slashers, IList<Explorer> explorers)
         {
             foreach (var slasher in slashers)
             {
-                if (!SlasherTargets.ContainsKey(slasher.Id))
-                    SlasherTargets.Add(slasher.Id, slasher.TargetId);
-                else
-                    SlasherTargets[slasher.Id] = slasher.TargetId;
+                var targetExplorer = explorers.SingleOrDefault(e => e.Id == slasher.TargetId);
+                if (targetExplorer == null) continue;
+                if (IsVisblePoint(slasher, targetExplorer.X, targetExplorer.Y))//м.б. невидим, если слешер только родился
+                    LastTimeVisibleExplorers[slasher.Id] = targetExplorer; 
             }
         }
 
+        private static IList<DamageItem> GetDamageItems(Explorer myExplorer, IList<Explorer> explorers, IList<Wanderer> wanderers, IList<Wanderer> slashers)
+        {
+            var damageItems = GetDamageItemsRec(myExplorer, explorers, wanderers, slashers, ExplorerPoints[myExplorer.Id], 0);
+            foreach (var di in damageItems)
+            {
+                Console.Error.WriteLine($"{di.Point.X} {di.Point.Y} {di.SumDamage} {di.Damage} {di.MinWandererDist} {di.MinWandererDistCount} {di.MinSlashersDist} {di.MinSlashersDistCount}");
+            }
+
+            return damageItems;
+
+        }
+
+        private static IList<DamageItem> GetDamageItemsRec(Explorer myExplorer, IList<Explorer> explorers,
+            IList<Wanderer> wanderers, IList<Wanderer> slashers, Point sourcePoint, int depth)
+        {
+            var damageItems = new List<DamageItem>();
+
+            var currentPossibleMoves = GetCurrentPossibleMoves(sourcePoint);
+            foreach (var move in currentPossibleMoves)
+            {
+                var myCurrExplorer = new Explorer(myExplorer.Id,
+                    move.X,
+                    move.Y,
+                    myExplorer.Sanity,
+                    myExplorer.Plans,
+                    myExplorer.Lights);
+                var newExplorers = GetNewExplorers(explorers, wanderers, slashers, myCurrExplorer);
+                var newWanderes = GetNewWanderes(newExplorers, wanderers);
+                var newSlashers = GetNewSlashers(newExplorers, slashers);
+
+                var damage = newWanderes.Count(w => w.X == move.X && w.Y == move.Y);
+                damage += newSlashers.Count(s => s.State == 4 && s.Time == 6 && s.X == move.X && s.Y == move.Y);
+
+                var minWandererDist = newWanderes.Any() ? newWanderes.Min(w => GetManhattenDist(w.X, w.Y, move.X, move.Y)) : 0;
+                var minWandererDistCount = newWanderes.Any() ? newWanderes.Count(w => GetManhattenDist(w.X, w.Y, move.X, move.Y) == minWandererDist) : 0;
+
+                var minSlahersDist = newSlashers.Any() ? newSlashers.Min(w => GetManhattenDist(w.X, w.Y, move.X, move.Y)) : 0;
+                var minSlahersDistCount = newSlashers.Any() ? newSlashers.Count(w => GetManhattenDist(w.X, w.Y, move.X, move.Y) == minSlahersDist) : 0;
+
+                var damageItem = new DamageItem()
+                {
+                    Damage = damage,
+                    Point = move,
+                    MinWandererDist = minWandererDist,
+                    MinWandererDistCount = minWandererDistCount,
+                    MinSlashersDist = minSlahersDist,
+                    MinSlashersDistCount = minSlahersDistCount
+                };
+
+                if (depth == PredictionDepth)
+                {
+                    damageItem.DamageChildren = new List<DamageItem>();
+                    continue;
+                }
+
+
+                newWanderes = newWanderes.Where(w => !newExplorers.Any(s => GetManhattenDist(w, s) == 0)).ToList();//удаляем странников, дошедших до цели
+                var nextDamages = GetDamageItemsRec(myExplorer, newExplorers, newWanderes, newSlashers, move, depth + 1);
+                damageItem.DamageChildren = nextDamages;
+
+                damageItems.Add(damageItem);
+            }
+
+            return damageItems;
+
+        }
+
+        private static IList<Point> GetCurrentPossibleMoves(Point sourcePoint)
+        {
+            var possibleMoves = new List<Point>() { sourcePoint };
+            foreach (Point n in sourcePoint.GetNeighbors(Points))
+            {
+                if (n.Weight == BigValue) continue;
+                possibleMoves.Add(n);
+            }
+
+            return possibleMoves;
+        }
+
+        private static IList<Explorer> GetNewExplorers(IList<Explorer> explorers, IList<Wanderer> wanderers, IList<Wanderer> slashers, Explorer myExplorer)
+        {
+            var newExplorers = new List<Explorer>();
+             
+            foreach (var explorer in explorers)
+            {
+                if (explorer.Id == myExplorer.Id)
+                {
+                    newExplorers.Add(myExplorer);
+                    continue;
+                }
+
+                var explorerPoint = PointsTable[explorer.X, explorer.Y]; 
+                var neighbours = explorerPoint.GetNeighbors(Points);
+                var minDamagePoint = explorerPoint;
+                var minDamage = wanderers.Count(w => GetManhattenDist(w, explorer) <= 1);
+                var walkingWanderers = wanderers.Where(w => w.State == 1);
+                var minWanderersDist = walkingWanderers.Any()
+                    ? walkingWanderers.Min(w => GetManhattenDist(w.X, w.Y, minDamagePoint.X, minDamagePoint.Y)) : 0;
+                var minVisibleSlashers = slashers.Count(s => IsVisblePoint(s, minDamagePoint.X, minDamagePoint.Y));
+
+                foreach (var slasher in slashers.Where(s => s.State == 3)) //Не проверяем TargetId - считаем, что целевой эксплорер может уйти
+                {
+                    if (IsVisblePoint(slasher, explorerPoint.X, explorerPoint.Y)) minDamage++;
+                }
+
+                foreach (Point n in neighbours)
+                {
+                    if (n.Weight == BigValue) continue;
+                    var damage = wanderers.Count(w => GetManhattenDist(w.X, w.Y, n.X, n.Y) <= 1);
+                    var wanderersDist = walkingWanderers.Any()
+                        ? walkingWanderers.Min(w => GetManhattenDist(w.X, w.Y, n.X, n.Y)) : 0;
+                    var visibleSlashers = slashers.Count(s => IsVisblePoint(s, n.X, n.Y));
+
+                    foreach (var slasher in slashers.Where(s => s.State == 3))
+                    {
+                        if (IsVisblePoint(slasher, n.X, n.Y)) damage++;
+                    }
+                        
+                    if (wanderersDist > minWanderersDist)
+                    {
+                        minDamage = damage;
+                        minDamagePoint = n;
+                        minWanderersDist = wanderersDist;
+                        minVisibleSlashers = visibleSlashers;
+                        continue;
+                    }
+                    if (wanderersDist < minWanderersDist) continue;
+
+                    if (damage < minDamage)
+                    {
+                        minDamage = damage;
+                        minDamagePoint = n;
+                        minWanderersDist = wanderersDist;
+                        minVisibleSlashers = visibleSlashers;
+                        continue;
+                    }
+                    if (damage > minDamage) continue;
+
+                    if (visibleSlashers < minVisibleSlashers)
+                    {
+                        minDamage = damage;
+                        minDamagePoint = n;
+                        minWanderersDist = wanderersDist;
+                        minVisibleSlashers = visibleSlashers;
+                        continue;
+                    }
+                    if (visibleSlashers > minVisibleSlashers) continue;
+
+
+                }
+                var newExplorer = new Explorer(explorer.Id, minDamagePoint.X, minDamagePoint.Y, explorer.Sanity, explorer.Plans, explorer.Lights);
+                newExplorers.Add(newExplorer);
+            }
+
+            return newExplorers;
+        }
+
+
+        private static IList<Wanderer> GetNewWanderes(IList<Explorer> explorers, IList<Wanderer> wanderers)
+        {
+            var newWanderes = new List<Wanderer>();
+            foreach (var wanderer in wanderers.Where(w => w.State == 1)) 
+            {
+                var orderedExplorers = explorers.OrderBy(e => GetManhattenDist(wanderer, e)).ToList();
+                var firstExplorer = orderedExplorers.First();
+                var manhDist = GetManhattenDist(firstExplorer, wanderer);
+
+                var nearestExplorers = orderedExplorers.Where(e =>
+                    GetManhattenDist(e, wanderer) == manhDist).ToList();
+
+                Explorer targetExplorer = nearestExplorers.SingleOrDefault(e => e.Id == wanderer.TargetId);
+                if (targetExplorer == null) targetExplorer = firstExplorer;//TODO
+
+                Point nearestPoint = PointsTable[wanderer.X, wanderer.Y];
+
+                var startPoint = PointsTable[wanderer.X, wanderer.Y];
+                var finalPoint = PointsTable[targetExplorer.X, targetExplorer.Y];
+                int minDist = Calculator.ReconstructPath(finalPoint, Ems[startPoint], Points).Count;
+                //if (manhDist > ManhDistToUseAStar)
+                //{
+                //    minDist = GetManhattenDist(nearestPoint.X,
+                //        nearestPoint.Y,
+                //        targetExplorer.X,
+                //        targetExplorer.Y);
+                //}
+                //else
+                //{
+                    
+                //    var path = Calculator.GetPath(startPoint, finalPoint, Points);
+                //    minDist = path.Count;
+                //}
+
+                if (nearestPoint.X != targetExplorer.X || nearestPoint.Y != targetExplorer.Y)
+                {
+                    foreach (Point n in nearestPoint.Neighbours)
+                    {
+                        if (n.Weight == BigValue) continue;
+                        //if (manhDist > ManhDistToUseAStar)
+                        //{
+                        //    dist = GetManhattenDist(n.X, n.Y, targetExplorer.X, targetExplorer.Y);
+                        //}
+                        //else
+                        //{
+                        //    var startPoint = PointsTable[n.X, n.Y];
+                        //    var path = Calculator.GetPath(startPoint, finalPoint, Points);
+                        //    dist = path.Count;
+                        //}
+                        var nStartPoint = PointsTable[n.X, n.Y];
+                        var dist = Calculator.ReconstructPath(finalPoint, Ems[nStartPoint], Points).Count;
+
+                        if (dist < minDist)
+                        {
+                            minDist = dist;
+                            nearestPoint = n;
+                        }
+
+                    }
+                }
+
+                var newWanderer = new Wanderer(wanderer.Id, nearestPoint.X, nearestPoint.Y, wanderer.Time - 1, wanderer.State, wanderer.TargetId);
+                newWanderes.Add(newWanderer);
+            }
+
+            return newWanderes;
+        }
+
+        private static IList<Wanderer> GetNewSlashers(IList<Explorer> explorers, IList<Wanderer> slashers)
+        {
+            var newSlashers = new List<Wanderer>();
+            foreach (var slasher in slashers)
+            {
+                var nearestVisibleExplorer = explorers.Where(e => IsVisblePoint(slasher, e.X, e.Y))
+                    .OrderBy(e => GetManhattenDist(slasher, e)).FirstOrDefault(); //TODO
+
+                if (slasher.State == 3) //прыгает
+                {
+                    int newSlasherX, newSlasherY;
+                    var targetExplorer = explorers.SingleOrDefault(e => e.Id == slasher.TargetId);
+                    if (targetExplorer != null)
+                    {
+                        if (IsVisblePoint(slasher, targetExplorer.X, targetExplorer.Y))
+                        {
+                            newSlasherX = targetExplorer.X;
+                            newSlasherY = targetExplorer.Y;
+                        }
+                        else
+                        {
+                            if (nearestVisibleExplorer != null)
+                            {
+                                newSlasherX = nearestVisibleExplorer.X;
+                                newSlasherY = nearestVisibleExplorer.Y;
+                            }
+                            else
+                            {
+                                if (LastTimeVisibleExplorers.ContainsKey(slasher.Id))
+                                {
+                                    newSlasherX = LastTimeVisibleExplorers[slasher.Id].X;
+                                    newSlasherY = LastTimeVisibleExplorers[slasher.Id].Y;
+                                }
+                                else
+                                {
+                                    newSlasherX = slasher.X;
+                                    newSlasherY = slasher.Y;
+                                }
+                            }
+                        }
+                    }
+                    else//никого не видно перед прыжком. но кто-то мог выйти на LoS
+                    {
+                        if (nearestVisibleExplorer != null)
+                        {
+                            newSlasherX = nearestVisibleExplorer.X;
+                            newSlasherY = nearestVisibleExplorer.Y;
+                        }
+                        else
+                        {
+                            if (LastTimeVisibleExplorers.ContainsKey(slasher.Id))
+                            {
+                                newSlasherX = LastTimeVisibleExplorers[slasher.Id].X;
+                                newSlasherY = LastTimeVisibleExplorers[slasher.Id].Y;
+                            }
+                            else
+                            {
+                                newSlasherX = slasher.X;
+                                newSlasherY = slasher.Y;
+                            }
+                        }
+                    }
+                    
+
+                    var newSlasher = new Wanderer(slasher.Id, newSlasherX, newSlasherY, 6, 4, -1);
+                    newSlashers.Add(newSlasher);
+                }
+                else if (slasher.State == 2) //готовится к прыжку
+                {
+                    var newTime = slasher.Time - 1;
+                    var newState = newTime == 0 ? 3 : 2;
+                    int newTargetExplorerId = -1;
+
+                    var targetExplorer = explorers.SingleOrDefault(e => e.Id == slasher.TargetId);
+                    if (targetExplorer != null)
+                    {
+                        if (IsVisblePoint(slasher, targetExplorer.X, targetExplorer.Y))
+                        {
+                            newTargetExplorerId = targetExplorer.Id;
+                        }
+                        else if (nearestVisibleExplorer != null)
+                        {
+                            newTargetExplorerId = nearestVisibleExplorer.Id;
+                        }
+                    }
+                    
+                    var newSlasher = new Wanderer(slasher.Id, slasher.X, slasher.Y, newTime, newState, newTargetExplorerId);
+                    newSlashers.Add(newSlasher);
+
+                }
+            }
+
+            return newSlashers;
+
+        }
 
 
 
         #region static and constants values
 
         private static IList<Point> Points { get; set; }
-        private static IDictionary<int, int> SlasherTargets = new Dictionary<int, int>();
+        private static Point[,] PointsTable { get; set; }
         private static IDictionary<int, Point> ExplorerPoints = new Dictionary<int, Point>();
         private static IDictionary<int, Point> WandererPoints = new Dictionary<int, Point>();
         private static IDictionary<int, Point> SlasherPoints = new Dictionary<int, Point>();
 
         private static IDictionary<int, Dictionary<int, int>> WandererExplorerPathDistances = new Dictionary<int, Dictionary<int, int>>();
+        private static IDictionary<int, Explorer> LastTimeVisibleExplorers = new Dictionary<int, Explorer>();
 
         private const int BigValue = 999999;
         private const int SlasherWeight = 1000;
@@ -1429,7 +2078,12 @@ namespace CodeOfKutulu2
 
         private const int ShelterDefaultEnergy = 10;
         private const int MaxShelterEnergyLeak = 3;
-        
+
+        private const int ManhDistToUseAStar = 4;
+        private const int PredictionDepth = 3;
+
+        private static IDictionary<APoint, ExpansionMatrixConteiner> Ems;
+
         #endregion
 
     }

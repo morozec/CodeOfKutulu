@@ -670,11 +670,31 @@ namespace CodeOfKutulu2
             WandererLifeTime = wandererLifeTime;
 
 
-            Ems = Calculator.GetExpansionMatrices(Points, Points);
+            var ems = Calculator.GetExpansionMatrices(Points.Where(p => p.Weight < BigValue), Points.Where(p => p.Weight < BigValue));
+            Pathes = new Dictionary<Point, IDictionary<Point, IList<APoint>>>();
+            for (int i = 0; i < height; ++i)
+            {
+                for (int j = 0; j < width; ++j)
+                {
+                    var source = PointsTable[j, i];
+                    if (source.Weight == BigValue) continue;
+                    Pathes.Add(source, new Dictionary<Point, IList<APoint>>());
+                    for (int k = 0; k < height; ++k)
+                    {
+                        for (int l = 0; l < width; ++l)
+                        {
+                            var dest = PointsTable[l, k];
+                            if (dest.Weight == BigValue) continue;
+                            var path = Calculator.ReconstructPath(dest, ems[source], Points);
+                            Pathes[source].Add(dest, path);
+                        }
+                    }
+                }
+            }
             //var path = Calculator.ReconstructPath(Points[10], ems[Points[0]], Points);
-           
-            // game loop
-            while (true)
+
+                    // game loop
+                    while (true)
             {
                 //var watch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -772,7 +792,7 @@ namespace CodeOfKutulu2
                 //        Console.Error.WriteLine($"{neighbour.X} {neighbour.Y} {neighbour.Weight}");
                 
                 
-                var escapePoint = GetNewEscapePoint(myExplorer, allExplorers, wanderers, slashers);
+                var escapePoint = GetNewEscapePoint(myExplorer, allExplorers, wanderers, slashers, shelters.Where(s => s.RemainigEnergy > 0));
                 if (escapePoint.X == myExplorer.X && escapePoint.Y == myExplorer.Y)
                 {
                     var useYell = UseYell(myExplorer, allExplorers, wanderers, slashers);
@@ -863,45 +883,9 @@ namespace CodeOfKutulu2
                 //var elapsedMs = watch.ElapsedMilliseconds;
             }
         }
-
-        static int GetWanderesCount(int x, int y, int myExplorerId, IList<Explorer> explorers, IList<Wanderer> wanderers)
-        {
-            var wanderesCount = 0;
-            var destPoint = PointsTable[x,y];
-            foreach (var wanderer in wanderers.Where(w => w.State == 1))
-            {
-                if (!WandererExplorerPathDistances.ContainsKey(wanderer.Id))
-                    WandererExplorerPathDistances.Add(wanderer.Id, new Dictionary<int, int>());
-
-                var startPoint = WandererPoints[wanderer.Id];
-                var path = Calculator.GetPath(startPoint, destPoint, Points);
-                var destDist = path.Count;
-                var isCloser = false;
-                foreach (var explorer in explorers.Where(e => e.Id != myExplorerId))
-                {
-                    if (!WandererExplorerPathDistances[wanderer.Id].ContainsKey(explorer.Id))
-                    {
-                        var finalPoint = ExplorerPoints[explorer.Id];
-                        var explorerPath = Calculator.GetPath(startPoint, finalPoint, Points);
-                        WandererExplorerPathDistances[wanderer.Id].Add(explorer.Id, explorerPath.Count);
-                    }
-                    var dist = WandererExplorerPathDistances[wanderer.Id][explorer.Id];
-                    if (dist < destDist || dist == destDist && wanderer.TargetId == explorer.Id)
-                    {
-                        isCloser = true;
-                        break;
-                    }
-
-
-                }
-                if (!isCloser) wanderesCount++;
-            }
-
-            return wanderesCount;
-        }
-
+       
         static Point GetNewEscapePoint(Explorer myExplorer, IList<Explorer> allExplorers,
-            IList<Wanderer> wanderers, IList<Wanderer> slashers)
+            IList<Wanderer> wanderers, IList<Wanderer> slashers, IEnumerable<Shelter> activeShelters)
         {
             var damageItems = GetDamageItems(myExplorer, allExplorers, wanderers, slashers);
             DamageItem minDamageItem = damageItems[0];
@@ -909,10 +893,10 @@ namespace CodeOfKutulu2
 
             var startPoint = PointsTable[myExplorer.X, myExplorer.Y];
             var minFriendDist = int.MaxValue;
-            foreach (var e in allExplorers)
+            foreach (var e in allExplorers.Where(e => e.Id != myExplorer.Id))
             {
                 var finalPoint = PointsTable[e.X, e.Y];
-                var path = Calculator.GetPath(startPoint, finalPoint, Points);
+                var path = Pathes[startPoint][finalPoint]; 
                 var dist = path.Count;
                 if (dist < minFriendDist)
                 {
@@ -939,10 +923,10 @@ namespace CodeOfKutulu2
                 //    .Min(e => GetManhattenDist(e.X, e.Y, di.Point.X, di.Point.Y));
                 var currStartPoint = PointsTable[di.Point.X, di.Point.Y];
                 var friendDist = int.MaxValue;
-                foreach (var e in allExplorers)
+                foreach (var e in allExplorers.Where(e => e.Id != myExplorer.Id))
                 {
                     var finalPoint = PointsTable[e.X, e.Y];
-                    var path = Calculator.GetPath(currStartPoint, finalPoint, Points);
+                    var path = Pathes[currStartPoint][finalPoint];
                     var dist = path.Count;
                     if (dist < friendDist)
                     {
@@ -989,6 +973,33 @@ namespace CodeOfKutulu2
                     index++;
                 }
                 if(isFinished) continue;
+
+                //стоим в шелтерах
+                index = 0;
+                while (index < minDiPath.Count)
+                {
+                    var hasDiShelter =
+                        activeShelters.Any(s => s.X == diPath[index].Point.X && s.Y == diPath[index].Point.Y);
+                    var hasMinDiShelter =
+                        activeShelters.Any(s => s.X == minDiPath[index].Point.X && s.Y == minDiPath[index].Point.Y);
+                    
+                    if (hasDiShelter && !hasMinDiShelter)
+                    {
+                        isFinished = true;
+                        minDamageItem = di;
+                        minFriendDist = friendDist;
+                        break;
+                    }
+
+                    if (!hasDiShelter && hasMinDiShelter)
+                    {
+                        isFinished = true;
+                        break;
+                    }
+
+                    index++;
+                }
+                if (isFinished) continue;
 
                 //ближе к другу, если мы вне ауры
                 if (minFriendDist > AuraRange)
@@ -1104,182 +1115,7 @@ namespace CodeOfKutulu2
 
             return minDamageItem.Point;
         }
-
-        /// <summary>
-        /// Ишет точку с минимальным весом, куда надо бежать из текущей
-        /// Если веса двух точек одинаковы, бежит в ту, которая ближе к другому Explorer'у
-        /// Не проверяет текущую точку на возможность остаться в ней
-        /// </summary>
-        /// <param name="startPoint"></param>
-        /// <param name="points"></param>
-        /// <param name="allExplorers"></param>
-        /// <param name="wanderers"></param>
-        /// <returns></returns>
-        static Point GetEscapePoint(Point startPoint, IList<Point> points, IList<Explorer> allExplorers, IList<Wanderer> wanderers, IList<Wanderer> slashers, int myExplorerId)
-        {
-            var neighbours = startPoint.GetNeighbors(points);
-
-            Point minWeightPoint = startPoint;
-            var minWeight = startPoint.Weight;
-            var minExplorerDist = allExplorers.Where(e => e.Id != myExplorerId).Min(e => GetManhattenDist(e.X, e.Y, startPoint.X, startPoint.Y));
-            
-            var dangerousWanderers = wanderers.Where(w => w.State == 1 || w.State == 0 && w.Time == 1).ToList();
-            var minWandererDist = !dangerousWanderers.Any() ? 0 : dangerousWanderers.Min(w => GetManhattenDist(w.X, w.Y, startPoint.X, startPoint.Y));
-            var minWanderersCount = GetWanderesCount(startPoint.X, startPoint.Y, myExplorerId, allExplorers, wanderers);
-            var minVisibleSlashersCount = slashers.Count(s => IsVisblePoint(s, startPoint.X, startPoint.Y));
-
-            Console.Error.WriteLine($"{startPoint.X} {startPoint.Y} {minExplorerDist} {minWanderersCount} {minVisibleSlashersCount} {minWandererDist}");
-
-            foreach (Point neighbour in neighbours)
-            {
-                if (neighbour.Weight == BigValue)
-                    continue;
-
-                var explorerDist = allExplorers.Where(e => e.Id != myExplorerId).Min(e => GetManhattenDist(e.X, e.Y, neighbour.X, neighbour.Y));
-                var wanderDist = !dangerousWanderers.Any() ?  0 : dangerousWanderers.Min(w => GetManhattenDist(w.X, w.Y, neighbour.X, neighbour.Y));
-                var wanderersCount = GetWanderesCount(neighbour.X, neighbour.Y, myExplorerId, allExplorers, wanderers);
-                var visibleSlashersCount =
-                    slashers.Count(s => IsVisblePoint(s, neighbour.X, neighbour.Y));
-
-                Console.Error.WriteLine($"{neighbour.X} {neighbour.Y} {explorerDist} {wanderersCount} {visibleSlashersCount} {wanderDist}");
-
-                if (neighbour.Weight < minWeight)
-                {
-                    minWeight = neighbour.Weight;
-                    minWeightPoint = neighbour;
-                    minExplorerDist = explorerDist;
-                    minWanderersCount = wanderersCount;
-                    minVisibleSlashersCount = visibleSlashersCount;
-                    minWandererDist = wanderDist;
-                }
-                else if (neighbour.Weight == minWeight)
-                {
-                    //TODO: дикие пляски с аурой
-                    if (explorerDist < minExplorerDist && minExplorerDist >= AuraRange)
-                    {
-                        minWeight = neighbour.Weight;
-                        minWeightPoint = neighbour;
-                        minExplorerDist = explorerDist;
-                        minWanderersCount = wanderersCount;
-                        minVisibleSlashersCount = visibleSlashersCount;
-                        minWandererDist = wanderDist;
-                    }
-                    else if (explorerDist <= minExplorerDist)
-                    {
-                        if (wanderersCount < minWanderersCount)
-                        {
-                            minWeight = neighbour.Weight;
-                            minWeightPoint = neighbour;
-                            minExplorerDist = explorerDist;
-                            minWanderersCount = wanderersCount;
-                            minVisibleSlashersCount = visibleSlashersCount;
-                            minWandererDist = wanderDist;
-                        }
-                        else if (wanderersCount == minWanderersCount)
-                        {
-                            if (visibleSlashersCount < minVisibleSlashersCount)
-                            {
-                                minWeight = neighbour.Weight;
-                                minWeightPoint = neighbour;
-                                minExplorerDist = explorerDist;
-                                minWanderersCount = wanderersCount;
-                                minVisibleSlashersCount = visibleSlashersCount;
-                                minWandererDist = wanderDist;
-                            }
-                            else if (visibleSlashersCount == minVisibleSlashersCount)
-                            {
-                                if (wanderDist > minWandererDist)
-                                {
-                                    minWeight = neighbour.Weight;
-                                    minWeightPoint = neighbour;
-                                    minExplorerDist = explorerDist;
-                                    minWanderersCount = wanderersCount;
-                                    minVisibleSlashersCount = visibleSlashersCount;
-                                    minWandererDist = wanderDist;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            return minWeightPoint;
-        }
-
-
-
-        static CellPoint GetGoPoint(Explorer myExplorer, IList<Explorer> allExplorers, IList<Shelter> shelters, IList<Point> points)
-        {
-            var startPoint = points.Single(p => p.X == myExplorer.X && p.Y == myExplorer.Y);
-
-            CellPoint nearestPoint = null;
-            var minDist = int.MaxValue;
-            foreach (var explorer in allExplorers)
-            {
-                if (explorer.Id == myExplorer.Id) continue;
-
-                var finalPoint = points.Single(p => p.X == explorer.X && p.Y == explorer.Y);
-                var path = Calculator.GetPath(startPoint, finalPoint, points);
-
-                var dist = path.Sum(p => (p as Point).Weight);
-                if (dist < minDist)
-                {
-                    nearestPoint = explorer;
-                    minDist = dist;
-                }
-            }
-
-            //TODO!!!
-            //foreach (var shelter in shelters.Where(s => s.RemainigEnergy > 0))
-            //{
-            //    var finalPoint = points.Single(p => p.X == shelter.X && p.Y == shelter.Y);
-            //    var path = Calculator.GetPath(startPoint, finalPoint, points);
-
-            //    var dist = path.Sum(p => (p as Point).Weight);
-            //    Console.Error.WriteLine($"{shelter.Id} {dist}");
-            //    if (dist < minDist)
-            //    {
-            //        nearestPoint = shelter;
-            //        minDist = dist;
-            //    }
-            //}
-
-            return nearestPoint;
-        }
-
-        static IDictionary<Point, int> GetWandererDangerousPoints(CellPoint myExplorerPoint, IList<Wanderer> wanderers, IList<Point> points)
-        {
-            var wandererDangerousPoints = new Dictionary<Point, int>();
-            foreach (var wanderer in wanderers.Where(w => w.State > 0 || w.State == 1 && w.Time == 1)) //пропускаем спящих
-            {
-                var wPoint = points.Single(p => p.X == wanderer.X && p.Y == wanderer.Y);
-
-                //TODO: подумать о проходимости несоседних клеток
-
-                //Клетка приведения
-                //if (GetManhattenDist(myExplorerPoint.X, myExplorerPoint.Y, wPoint.X, wPoint.Y) == 1)
-                //{
-                    if (!wandererDangerousPoints.ContainsKey(wPoint)) wandererDangerousPoints.Add(wPoint, 0);
-                    wandererDangerousPoints[wPoint]++;
-                //}
-
-                //Клетки, куда оно может пойти
-                var wNeighbours = wPoint.GetNeighbors(points);
-                foreach (Point neighbour in wNeighbours)
-                {
-                    if (neighbour.Weight == BigValue) continue;//стена
-                    var dist = GetManhattenDist(myExplorerPoint.X, myExplorerPoint.Y, neighbour.X, neighbour.Y);
-                    if (dist <= 1)
-                    {
-                        if (!wandererDangerousPoints.ContainsKey(neighbour)) wandererDangerousPoints.Add(neighbour, 0);
-                        wandererDangerousPoints[neighbour]++;
-                    }
-
-                }
-            }
-
-            return wandererDangerousPoints;
-        }
+       
 
         static bool IsVisblePoint(CellPoint source, int destX, int destY)
         {
@@ -1659,9 +1495,8 @@ namespace CodeOfKutulu2
                     var afterLightWandererPoint = PointsTable[point2.X, point2.Y];
                     var afterLightExplorerPoint = ExplorerPoints[explorer.Id];
 
-                    var afterLightMyPath = Calculator.GetPath(afterLightWandererPoint, noLightMyPoint, Points);
-                    var afterLightExplorerPath =
-                        Calculator.GetPath(afterLightWandererPoint, afterLightExplorerPoint, Points);
+                    var afterLightMyPath = Pathes[afterLightWandererPoint][noLightMyPoint];
+                    var afterLightExplorerPath = Pathes[afterLightWandererPoint][afterLightExplorerPoint];
 
                     if (afterLightMyPath.Sum(p => (p as Point).Weight) >
                         afterLightExplorerPath.Sum(p => (p as Point).Weight))
@@ -1872,21 +1707,26 @@ namespace CodeOfKutulu2
             var newWanderes = new List<Wanderer>();
             foreach (var wanderer in wanderers.Where(w => w.State == 1)) 
             {
-                var orderedExplorers = explorers.OrderBy(e => GetManhattenDist(wanderer, e)).ToList();
-                var firstExplorer = orderedExplorers.First();
-                var manhDist = GetManhattenDist(firstExplorer, wanderer);
+                if (wanderer.Time == 0) continue;
 
-                var nearestExplorers = orderedExplorers.Where(e =>
-                    GetManhattenDist(e, wanderer) == manhDist).ToList();
+                var pathCounts = new Dictionary<Explorer, int>();
+                foreach (var e in explorers)
+                {
+                    var path = Pathes[PointsTable[wanderer.X, wanderer.Y]][PointsTable[e.X, e.Y]]; 
+                    pathCounts.Add(e, path.Count);
+                }
+
+                var minPathCount = pathCounts.Values.Min();
+                var nearestExplorers = explorers.Where(e => pathCounts[e] == minPathCount).ToList(); 
 
                 Explorer targetExplorer = nearestExplorers.SingleOrDefault(e => e.Id == wanderer.TargetId);
-                if (targetExplorer == null) targetExplorer = firstExplorer;//TODO
+                if (targetExplorer == null) targetExplorer = nearestExplorers.First();//TODO
 
                 Point nearestPoint = PointsTable[wanderer.X, wanderer.Y];
 
                 var startPoint = PointsTable[wanderer.X, wanderer.Y];
                 var finalPoint = PointsTable[targetExplorer.X, targetExplorer.Y];
-                int minDist = Calculator.ReconstructPath(finalPoint, Ems[startPoint], Points).Count;
+                int minDist = Pathes[startPoint][finalPoint].Count; 
                 //if (manhDist > ManhDistToUseAStar)
                 //{
                 //    minDist = GetManhattenDist(nearestPoint.X,
@@ -1917,7 +1757,7 @@ namespace CodeOfKutulu2
                         //    dist = path.Count;
                         //}
                         var nStartPoint = PointsTable[n.X, n.Y];
-                        var dist = Calculator.ReconstructPath(finalPoint, Ems[nStartPoint], Points).Count;
+                        var dist = Pathes[nStartPoint][finalPoint].Count;
 
                         if (dist < minDist)
                         {
@@ -2082,7 +1922,8 @@ namespace CodeOfKutulu2
         private const int ManhDistToUseAStar = 4;
         private const int PredictionDepth = 3;
 
-        private static IDictionary<APoint, ExpansionMatrixConteiner> Ems;
+        //private static IDictionary<APoint, ExpansionMatrixConteiner> Ems;
+        private static IDictionary<Point, IDictionary<Point, IList<APoint>>> Pathes;
 
         #endregion
 

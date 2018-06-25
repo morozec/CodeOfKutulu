@@ -555,6 +555,8 @@ namespace CodeOfKutulu2
             public int MinWandererDist { get; set; }
             public int MinWandererDistCount { get; set; }
 
+            public int MinSlashersDist { get; set; }
+            public int MinSlashersDistCount { get; set; }
 
             public bool CanBeYelled { get; set; }
 
@@ -617,9 +619,9 @@ namespace CodeOfKutulu2
         {
             string[] inputs;
             int width = int.Parse(Console.ReadLine());
-            Console.Error.WriteLine(width);
+            //Console.Error.WriteLine(width);
             int height = int.Parse(Console.ReadLine());
-            Console.Error.WriteLine(height);
+            //Console.Error.WriteLine(height);
 
             Points = new List<Point>();
             PointsTable = new Point[width, height];
@@ -628,7 +630,7 @@ namespace CodeOfKutulu2
             for (int i = 0; i < height; i++)
             {
                 string line = Console.ReadLine();
-                Console.Error.WriteLine(line);
+                //Console.Error.WriteLine(line);
                 for (int j = 0; j < line.Length; ++j)
                 {
                     var ch = line[j];
@@ -664,7 +666,7 @@ namespace CodeOfKutulu2
             }
 
             var str = Console.ReadLine();
-            Console.Error.WriteLine(str);
+            //Console.Error.WriteLine(str);
             inputs = str.Split(' ');
 
             int sanityLossLonely =
@@ -751,13 +753,13 @@ namespace CodeOfKutulu2
                 IList<Shelter> shelters = new List<Shelter>();
 
                 str = Console.ReadLine();
-                Console.Error.WriteLine(str);
+                //Console.Error.WriteLine(str);
                 int entityCount = int.Parse(str); // the first given entity corresponds to your explorer
                 var amIYelled = false;
                 for (int i = 0; i < entityCount; i++)
                 {
                     str = Console.ReadLine();
-                    Console.Error.WriteLine(str);
+                    //Console.Error.WriteLine(str);
                     inputs = str.Split(' ');
                     string entityType = inputs[0];
                     int id = int.Parse(inputs[1]);
@@ -1187,29 +1189,29 @@ namespace CodeOfKutulu2
                 if (friendDistance > minFriendDistance) continue;
 
                 //дальше от слэшеров
-                //index = 0;
-                //while (index < minDiPath.Count)
-                //{
-                //    if (di.MinSlashersDist > minDamageItem.MinSlashersDist)
-                //    {
-                //        isFinished = true;
-                //        minDamageItem = di;
-                //        minFds = fds;
-                //        minFriendDistance = friendDistance;
-                //        nextMinFd = nextFd;
-                //        minOrderedWanderers = orderedWanderers;
-                //        break;
-                //    }
+                index = 0;
+                while (index < minDiPath.Count)
+                {
+                    if (diPath[index].MinSlashersDist > minDiPath[index].MinSlashersDist)
+                    {
+                        isFinished = true;
+                        minDamageItem = di;
+                        minFds = fds;
+                        minFriendDistance = friendDistance;
+                        nextMinFd = nextFd;
+                        minOrderedWanderers = orderedWanderers;
+                        break;
+                    }
 
-                //    if (di.MinSlashersDist < minDamageItem.MinSlashersDist)
-                //    {
-                //        isFinished = true;
-                //        break;
-                //    }
+                    if (diPath[index].MinSlashersDist < minDiPath[index].MinSlashersDist)
+                    {
+                        isFinished = true;
+                        break;
+                    }
 
-                //    index++;
-                //}
-                //if (isFinished) continue;
+                    index++;
+                }
+                if (isFinished) continue;
 
                 //меньше новых странников
                 index = 0;
@@ -1237,29 +1239,29 @@ namespace CodeOfKutulu2
                 if (isFinished) continue;
 
                 //меньше слэшеров
-                //index = 0;
-                //while (index < minDiPath.Count)
-                //{
-                //    if (di.MinSlashersDistCount < minDamageItem.MinSlashersDistCount)
-                //    {
-                //        isFinished = true;
-                //        minDamageItem = di;
-                //        minFds = fds;
-                //        minFriendDistance = friendDistance;
-                //        nextMinFd = nextFd;
-                //        minOrderedWanderers = orderedWanderers;
-                //        break;
-                //    }
+                index = 0;
+                while (index < minDiPath.Count)
+                {
+                    if (diPath[index].MinSlashersDistCount < minDiPath[index].MinSlashersDistCount)
+                    {
+                        isFinished = true;
+                        minDamageItem = di;
+                        minFds = fds;
+                        minFriendDistance = friendDistance;
+                        nextMinFd = nextFd;
+                        minOrderedWanderers = orderedWanderers;
+                        break;
+                    }
 
-                //    if (di.MinSlashersDistCount > minDamageItem.MinSlashersDistCount)
-                //    {
-                //        isFinished = true;
-                //        break;
-                //    }
+                    if (diPath[index].MinSlashersDistCount > minDiPath[index].MinSlashersDistCount)
+                    {
+                        isFinished = true;
+                        break;
+                    }
 
-                //    index++;
-                //}
-                //if (isFinished) continue;
+                    index++;
+                }
+                if (isFinished) continue;
 
                 //следующий ближайший друг
                 if (nextFd < nextMinFd)
@@ -1567,10 +1569,10 @@ namespace CodeOfKutulu2
         private static IList<DamageItem> GetDamageItems(Explorer myExplorer, IList<Explorer> explorers, IList<Wanderer> wanderers, IList<Wanderer> slashers)
         {
             var damageItems = GetDamageItemsRec(myExplorer, explorers, wanderers, slashers, ExplorerPoints[myExplorer.Id], 0, new List<int>());
-            foreach (var di in damageItems)
-            {
-                Console.Error.WriteLine($"x:{di.Point.X} y:{di.Point.Y} SumD:{di.MySumDamage} D:{di.MyDamage} WD:{di.MinWandererDist} WDC:{di.MinWandererDistCount}  NWC:{di.NewWanderersCount} ?:{di.SumDamage}");
-            }
+            //foreach (var di in damageItems)
+            //{
+            //    Console.Error.WriteLine($"x:{di.Point.X} y:{di.Point.Y} SumD:{di.MySumDamage} D:{di.MyDamage} WD:{di.MinWandererDist} NWC:{di.NewWanderersCount} SD:{di.MinSlashersDist} WDC:{di.MinWandererDistCount} SDC:{di.MinSlashersDistCount} ?:{di.SumDamage}");
+            //}
 
             return damageItems;
 
@@ -1646,10 +1648,10 @@ namespace CodeOfKutulu2
 
                     if (w.TargetId == myExplorer.Id) continue;
                     var isMinDist = true;
-                    foreach (var e in newExplorers.Where(e => e.Id != myExplorer.Id))//новые позиции ???
+                    foreach (var e in newExplorers.Where(e => e.Id != myExplorer.Id))//старые позиции, т.к. не уверены, куда они пойдут
                     {
                         var eDist = Pathes[w.X, w.Y][e.X, e.Y].Count;
-                        if (eDist <= dist)
+                        if (eDist < dist)
                         {
                             isMinDist = false;
                             break;
@@ -1659,36 +1661,19 @@ namespace CodeOfKutulu2
                     if (isMinDist) newWanderersCount++;
                 }
 
-                foreach (var w in slashers)//старые позиции
+                int minSlasherDist = int.MaxValue;
+                int minSlasherDistCount = 0;
+                foreach (var w in newSlashers)
                 {
                     var dist = Pathes[w.X, w.Y][move.X, move.Y].Count;
-                    if (w.TargetId == myExplorer.Id)
+                    if (dist < minSlasherDist)
                     {
-                        if (dist < minWandererDist)
-                        {
-                            minWandererDist = dist;
-                            minWandererDistCount = 1;
-                        }
-                        else if (dist == minWandererDist)
-                        {
-                            minWandererDistCount++;
-                        }
+                        minSlasherDist = dist;
+                        minSlasherDistCount = 1;
                     }
-
-                    else if( w.State != 2 && w.State != 3)//эти уже прыгают
+                    else if (dist == minSlasherDist)
                     {
-                        var isMinDist = true;
-                        foreach (var e in newExplorers.Where(e => e.Id != myExplorer.Id)) //новые позиции ???
-                        {
-                            var eDist = Pathes[w.X, w.Y][e.X, e.Y].Count;
-                            if (eDist <= dist)
-                            {
-                                isMinDist = false;
-                                break;
-                            }
-                        }
-
-                        if (isMinDist) newWanderersCount++;
+                        minSlasherDistCount++;
                     }
                 }
 
@@ -1703,6 +1688,8 @@ namespace CodeOfKutulu2
                     Point = move,
                     MinWandererDist = minWandererDist,
                     MinWandererDistCount = minWandererDistCount,
+                    MinSlashersDist = minSlasherDist,
+                    MinSlashersDistCount = minSlasherDistCount,
                     CanBeYelled = canBeYelled,
                     NewWanderersCount = newWanderersCount,
                     YelledExplorersDamage = yelledExplorersDamage

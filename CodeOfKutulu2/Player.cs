@@ -1129,7 +1129,7 @@ namespace CodeOfKutulu2
                 index = 0;
                 while (index < minDiPath.Count)
                 {
-                    if (diPath[index].MinWandererDist > minDiPath[index].MinWandererDist)
+                    if (di.MinWandererDist > minDamageItem.MinWandererDist)
                     {
                         isFinished = true;
                         minDamageItem = di;
@@ -1140,7 +1140,7 @@ namespace CodeOfKutulu2
                         break;
                     }
 
-                    if (diPath[index].MinWandererDist < minDiPath[index].MinWandererDist)
+                    if (di.MinWandererDist < minDamageItem.MinWandererDist)
                     {
                         isFinished = true;
                         break;
@@ -1154,7 +1154,7 @@ namespace CodeOfKutulu2
                 index = 0;
                 while (index < minDiPath.Count)
                 {
-                    if (diPath[index].MinWandererDistCount < minDiPath[index].MinWandererDistCount)
+                    if (di.MinWandererDistCount < minDamageItem.MinWandererDistCount)
                     {
                         isFinished = true;
                         minDamageItem = di;
@@ -1165,7 +1165,7 @@ namespace CodeOfKutulu2
                         break;
                     }
 
-                    if (diPath[index].MinWandererDistCount > minDiPath[index].MinWandererDistCount)
+                    if (di.MinWandererDistCount > minDamageItem.MinWandererDistCount)
                     {
                         isFinished = true;
                         break;
@@ -1192,7 +1192,7 @@ namespace CodeOfKutulu2
                 index = 0;
                 while (index < minDiPath.Count)
                 {
-                    if (diPath[index].MinSlashersDist > minDiPath[index].MinSlashersDist)
+                    if (di.MinSlashersDist > minDamageItem.MinSlashersDist)
                     {
                         isFinished = true;
                         minDamageItem = di;
@@ -1203,7 +1203,7 @@ namespace CodeOfKutulu2
                         break;
                     }
 
-                    if (diPath[index].MinSlashersDist < minDiPath[index].MinSlashersDist)
+                    if (di.MinSlashersDist < minDamageItem.MinSlashersDist)
                     {
                         isFinished = true;
                         break;
@@ -1217,7 +1217,7 @@ namespace CodeOfKutulu2
                 index = 0;
                 while (index < minDiPath.Count)
                 {
-                    if (diPath[index].NewWanderersCount < minDiPath[index].NewWanderersCount)
+                    if (di.NewWanderersCount < minDamageItem.NewWanderersCount)
                     {
                         isFinished = true;
                         minDamageItem = di;
@@ -1228,7 +1228,7 @@ namespace CodeOfKutulu2
                         break;
                     }
 
-                    if (diPath[index].NewWanderersCount > minDiPath[index].NewWanderersCount)
+                    if (di.NewWanderersCount > minDamageItem.NewWanderersCount)
                     {
                         isFinished = true;
                         break;
@@ -1242,7 +1242,7 @@ namespace CodeOfKutulu2
                 index = 0;
                 while (index < minDiPath.Count)
                 {
-                    if (diPath[index].MinSlashersDistCount < minDiPath[index].MinSlashersDistCount)
+                    if (di.MinSlashersDistCount < minDamageItem.MinSlashersDistCount)
                     {
                         isFinished = true;
                         minDamageItem = di;
@@ -1253,7 +1253,7 @@ namespace CodeOfKutulu2
                         break;
                     }
 
-                    if (diPath[index].MinSlashersDistCount > minDiPath[index].MinSlashersDistCount)
+                    if (di.MinSlashersDistCount > minDamageItem.MinSlashersDistCount)
                     {
                         isFinished = true;
                         break;

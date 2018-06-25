@@ -617,9 +617,9 @@ namespace CodeOfKutulu2
         {
             string[] inputs;
             int width = int.Parse(Console.ReadLine());
-            //Console.Error.WriteLine(width);
+            Console.Error.WriteLine(width);
             int height = int.Parse(Console.ReadLine());
-            //Console.Error.WriteLine(height);
+            Console.Error.WriteLine(height);
 
             Points = new List<Point>();
             PointsTable = new Point[width, height];
@@ -628,7 +628,7 @@ namespace CodeOfKutulu2
             for (int i = 0; i < height; i++)
             {
                 string line = Console.ReadLine();
-                //Console.Error.WriteLine(line);
+                Console.Error.WriteLine(line);
                 for (int j = 0; j < line.Length; ++j)
                 {
                     var ch = line[j];
@@ -664,7 +664,7 @@ namespace CodeOfKutulu2
             }
 
             var str = Console.ReadLine();
-            //Console.Error.WriteLine(str);
+            Console.Error.WriteLine(str);
             inputs = str.Split(' ');
 
             int sanityLossLonely =
@@ -751,13 +751,13 @@ namespace CodeOfKutulu2
                 IList<Shelter> shelters = new List<Shelter>();
 
                 str = Console.ReadLine();
-                //Console.Error.WriteLine(str);
+                Console.Error.WriteLine(str);
                 int entityCount = int.Parse(str); // the first given entity corresponds to your explorer
                 var amIYelled = false;
                 for (int i = 0; i < entityCount; i++)
                 {
                     str = Console.ReadLine();
-                    //Console.Error.WriteLine(str);
+                    Console.Error.WriteLine(str);
                     inputs = str.Split(' ');
                     string entityType = inputs[0];
                     int id = int.Parse(inputs[1]);
@@ -1567,10 +1567,10 @@ namespace CodeOfKutulu2
         private static IList<DamageItem> GetDamageItems(Explorer myExplorer, IList<Explorer> explorers, IList<Wanderer> wanderers, IList<Wanderer> slashers)
         {
             var damageItems = GetDamageItemsRec(myExplorer, explorers, wanderers, slashers, ExplorerPoints[myExplorer.Id], 0, new List<int>());
-            //foreach (var di in damageItems)
-            //{
-            //    Console.Error.WriteLine($"x:{di.Point.X} y:{di.Point.Y} SumD:{di.MySumDamage} D:{di.MyDamage} WD:{di.MinWandererDist} NWC:{di.NewWanderersCount} SD:{di.MinSlashersDist} WDC:{di.MinWandererDistCount} SDC:{di.MinSlashersDistCount} ?:{di.SumDamage}");
-            //}
+            foreach (var di in damageItems)
+            {
+                Console.Error.WriteLine($"x:{di.Point.X} y:{di.Point.Y} SumD:{di.MySumDamage} D:{di.MyDamage} WD:{di.MinWandererDist} WDC:{di.MinWandererDistCount}  NWC:{di.NewWanderersCount} ?:{di.SumDamage}");
+            }
 
             return damageItems;
 
@@ -1646,10 +1646,10 @@ namespace CodeOfKutulu2
 
                     if (w.TargetId == myExplorer.Id) continue;
                     var isMinDist = true;
-                    foreach (var e in newExplorers.Where(e => e.Id != myExplorer.Id))//старые позиции, т.к. не уверены, куда они пойдут
+                    foreach (var e in newExplorers.Where(e => e.Id != myExplorer.Id))//новые позиции ???
                     {
                         var eDist = Pathes[w.X, w.Y][e.X, e.Y].Count;
-                        if (eDist < dist)
+                        if (eDist <= dist)
                         {
                             isMinDist = false;
                             break;
@@ -1659,32 +1659,37 @@ namespace CodeOfKutulu2
                     if (isMinDist) newWanderersCount++;
                 }
 
-                foreach (var w in newSlashers)
+                foreach (var w in slashers)//старые позиции
                 {
                     var dist = Pathes[w.X, w.Y][move.X, move.Y].Count;
-                    if (dist < minWandererDist)
+                    if (w.TargetId == myExplorer.Id)
                     {
-                        minWandererDist = dist;
-                        minWandererDistCount = 1;
-                    }
-                    else if (dist == minWandererDist)
-                    {
-                        minWandererDistCount++;
-                    }
-
-                    if (w.TargetId == myExplorer.Id) continue;
-                    var isMinDist = true;
-                    foreach (var e in newExplorers.Where(e => e.Id != myExplorer.Id))//старые позиции, т.к. не уверены, куда они пойдут
-                    {
-                        var eDist = Pathes[w.X, w.Y][e.X, e.Y].Count;
-                        if (eDist < dist)
+                        if (dist < minWandererDist)
                         {
-                            isMinDist = false;
-                            break;
+                            minWandererDist = dist;
+                            minWandererDistCount = 1;
+                        }
+                        else if (dist == minWandererDist)
+                        {
+                            minWandererDistCount++;
                         }
                     }
 
-                    if (isMinDist) newWanderersCount++;
+                    else if( w.State != 2 && w.State != 3)//эти уже прыгают
+                    {
+                        var isMinDist = true;
+                        foreach (var e in newExplorers.Where(e => e.Id != myExplorer.Id)) //новые позиции ???
+                        {
+                            var eDist = Pathes[w.X, w.Y][e.X, e.Y].Count;
+                            if (eDist <= dist)
+                            {
+                                isMinDist = false;
+                                break;
+                            }
+                        }
+
+                        if (isMinDist) newWanderersCount++;
+                    }
                 }
 
                 var canBeYelled = newExplorers.Any(e =>

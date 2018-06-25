@@ -1424,7 +1424,9 @@ namespace CodeOfKutulu2
                 var damage = 0;
                 foreach (var w in wanderers)
                 {
-                    if (Pathes[w.X, w.Y][e.X, e.Y].Count - 1 <= 2) damage++;
+                    var dist = Pathes[w.X, w.Y][e.X, e.Y].Count - 1;
+                    if (dist == 2) damage++;
+                    else if (dist == 1 && GetManhattenDist(myExplorer, w) > 1) damage++;
                 }
 
                 foreach (var s in slashers)

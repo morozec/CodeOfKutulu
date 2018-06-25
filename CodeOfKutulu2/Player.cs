@@ -555,8 +555,6 @@ namespace CodeOfKutulu2
             public int MinWandererDist { get; set; }
             public int MinWandererDistCount { get; set; }
 
-            public int MinSlashersDist { get; set; }
-            public int MinSlashersDistCount { get; set; }
 
             public bool CanBeYelled { get; set; }
 
@@ -1189,29 +1187,29 @@ namespace CodeOfKutulu2
                 if (friendDistance > minFriendDistance) continue;
 
                 //дальше от слэшеров
-                index = 0;
-                while (index < minDiPath.Count)
-                {
-                    if (di.MinSlashersDist > minDamageItem.MinSlashersDist)
-                    {
-                        isFinished = true;
-                        minDamageItem = di;
-                        minFds = fds;
-                        minFriendDistance = friendDistance;
-                        nextMinFd = nextFd;
-                        minOrderedWanderers = orderedWanderers;
-                        break;
-                    }
+                //index = 0;
+                //while (index < minDiPath.Count)
+                //{
+                //    if (di.MinSlashersDist > minDamageItem.MinSlashersDist)
+                //    {
+                //        isFinished = true;
+                //        minDamageItem = di;
+                //        minFds = fds;
+                //        minFriendDistance = friendDistance;
+                //        nextMinFd = nextFd;
+                //        minOrderedWanderers = orderedWanderers;
+                //        break;
+                //    }
 
-                    if (di.MinSlashersDist < minDamageItem.MinSlashersDist)
-                    {
-                        isFinished = true;
-                        break;
-                    }
+                //    if (di.MinSlashersDist < minDamageItem.MinSlashersDist)
+                //    {
+                //        isFinished = true;
+                //        break;
+                //    }
 
-                    index++;
-                }
-                if (isFinished) continue;
+                //    index++;
+                //}
+                //if (isFinished) continue;
 
                 //меньше новых странников
                 index = 0;
@@ -1239,29 +1237,29 @@ namespace CodeOfKutulu2
                 if (isFinished) continue;
 
                 //меньше слэшеров
-                index = 0;
-                while (index < minDiPath.Count)
-                {
-                    if (di.MinSlashersDistCount < minDamageItem.MinSlashersDistCount)
-                    {
-                        isFinished = true;
-                        minDamageItem = di;
-                        minFds = fds;
-                        minFriendDistance = friendDistance;
-                        nextMinFd = nextFd;
-                        minOrderedWanderers = orderedWanderers;
-                        break;
-                    }
+                //index = 0;
+                //while (index < minDiPath.Count)
+                //{
+                //    if (di.MinSlashersDistCount < minDamageItem.MinSlashersDistCount)
+                //    {
+                //        isFinished = true;
+                //        minDamageItem = di;
+                //        minFds = fds;
+                //        minFriendDistance = friendDistance;
+                //        nextMinFd = nextFd;
+                //        minOrderedWanderers = orderedWanderers;
+                //        break;
+                //    }
 
-                    if (di.MinSlashersDistCount > minDamageItem.MinSlashersDistCount)
-                    {
-                        isFinished = true;
-                        break;
-                    }
+                //    if (di.MinSlashersDistCount > minDamageItem.MinSlashersDistCount)
+                //    {
+                //        isFinished = true;
+                //        break;
+                //    }
 
-                    index++;
-                }
-                if (isFinished) continue;
+                //    index++;
+                //}
+                //if (isFinished) continue;
 
                 //следующий ближайший друг
                 if (nextFd < nextMinFd)
@@ -1661,20 +1659,32 @@ namespace CodeOfKutulu2
                     if (isMinDist) newWanderersCount++;
                 }
 
-                int minSlasherDist = int.MaxValue;
-                int minSlasherDistCount = 0;
                 foreach (var w in newSlashers)
                 {
                     var dist = Pathes[w.X, w.Y][move.X, move.Y].Count;
-                    if (dist < minSlasherDist)
+                    if (dist < minWandererDist)
                     {
-                        minSlasherDist = dist;
-                        minSlasherDistCount = 1;
+                        minWandererDist = dist;
+                        minWandererDistCount = 1;
                     }
-                    else if (dist == minSlasherDist)
+                    else if (dist == minWandererDist)
                     {
-                        minSlasherDistCount++;
+                        minWandererDistCount++;
                     }
+
+                    if (w.TargetId == myExplorer.Id) continue;
+                    var isMinDist = true;
+                    foreach (var e in newExplorers.Where(e => e.Id != myExplorer.Id))//старые позиции, т.к. не уверены, куда они пойдут
+                    {
+                        var eDist = Pathes[w.X, w.Y][e.X, e.Y].Count;
+                        if (eDist < dist)
+                        {
+                            isMinDist = false;
+                            break;
+                        }
+                    }
+
+                    if (isMinDist) newWanderersCount++;
                 }
 
                 var canBeYelled = newExplorers.Any(e =>
@@ -1688,8 +1698,6 @@ namespace CodeOfKutulu2
                     Point = move,
                     MinWandererDist = minWandererDist,
                     MinWandererDistCount = minWandererDistCount,
-                    MinSlashersDist = minSlasherDist,
-                    MinSlashersDistCount = minSlasherDistCount,
                     CanBeYelled = canBeYelled,
                     NewWanderersCount = newWanderersCount,
                     YelledExplorersDamage = yelledExplorersDamage
